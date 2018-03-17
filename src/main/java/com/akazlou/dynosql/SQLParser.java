@@ -27,23 +27,26 @@ class SQLParser {
         if (!matcher.matches()) {
             return Optional.empty();
         }
-        final List<String> columns = parseColumns(matcher.group(COLUMNS_MATCHER_GROUP).split(COLUMNS_SEPARATOR));
+        final List<SQLQuery.Column> columns = parseColumns(matcher.group(COLUMNS_MATCHER_GROUP).split(COLUMNS_SEPARATOR));
         final String table = matcher.group(TABLE_MATCHER_GROUP).trim();
         final List<SQLQuery.Expr> conditions = parseConditions(matcher.group(CONDITIONS_MATCHER_GROUP));
 
         return Optional.of(new SQLQuery(table, columns, conditions));
     }
 
-    private List<String> parseColumns(final String[] columns) {
+    private List<SQLQuery.Column> parseColumns(final String[] columns) {
         return Arrays.stream(columns)
                 .map(String::trim)
                 .map(column -> {
                     final String columnLower = column.toLowerCase(Locale.ROOT);
                     if (columnLower.contains(AS_KEYWORD)) {
-                        return column.substring(columnLower.indexOf(AS_KEYWORD) + AS_KEYWORD.length())
+                        final int asKeywordIndex = columnLower.indexOf(AS_KEYWORD);
+                        final String name = column.substring(0, asKeywordIndex).trim();
+                        final String alias = column.substring(asKeywordIndex + AS_KEYWORD.length())
                                 .trim();
+                        return new SQLQuery.Column(name, alias);
                     }
-                    return column;
+                    return new SQLQuery.Column(column);
                 })
                 .collect(Collectors.toList());
     }

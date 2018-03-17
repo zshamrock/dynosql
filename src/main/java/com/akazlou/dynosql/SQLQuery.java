@@ -2,14 +2,15 @@ package com.akazlou.dynosql;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 class SQLQuery {
 
     private final String tableName;
-    private final List<String> columns;
+    private final List<Column> columns;
     private final List<Expr> conditions;
 
-    SQLQuery(final String tableName, final List<String> columns, final List<Expr> conditions) {
+    SQLQuery(final String tableName, final List<Column> columns, final List<Expr> conditions) {
         this.tableName = tableName;
         this.columns = columns;
         this.conditions = conditions;
@@ -19,7 +20,7 @@ class SQLQuery {
         return tableName;
     }
 
-    List<String> getColumns() {
+    List<Column> getColumns() {
         return columns;
     }
 
@@ -29,6 +30,46 @@ class SQLQuery {
 
     public enum Type {
         SELECT
+    }
+
+    static final class Column {
+        private final String name;
+        private final String alias;
+
+        Column(final String name) {
+            this(name, null);
+        }
+
+        Column(final String name, final String alias) {
+            this.name = name;
+            this.alias = alias;
+        }
+
+        String getName() {
+            return name;
+        }
+
+        Optional<String> getAlias() {
+            return Optional.ofNullable(alias);
+        }
+
+        @Override
+        public boolean equals(final Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof Column)) {
+                return false;
+            }
+            final Column column = (Column) o;
+            return Objects.equals(name, column.name) &&
+                    Objects.equals(alias, column.alias);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(name, alias);
+        }
     }
 
     interface Expr {
