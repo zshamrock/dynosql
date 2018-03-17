@@ -16,10 +16,11 @@ class SQLParserSpec extends Specification {
         query.conditions == conditions
 
         where:
-        sql                             || tableName || columns            || conditions
-        "select * from T"               || "T"       || ["*"]              || []
-        "select x, y from db.T"         || "db.T"    || ["x", "y"]         || []
-        "SELECT col1, col2 FROM db_T"   || "db_T"    || ["col1", "col2"]   || []
-        "sElEcT COL_1, Col-2 FrOM db-T" || "db-T"    || ["COL_1", "Col-2"] || []
+        sql                                               || tableName || columns                  || conditions
+        "select * from T"                                 || "T"       || ["*"]                    || []
+        "select x, y from db.T"                           || "db.T"    || ["x", "y"]               || []
+        "SELECT col1, col2 FROM db_T"                     || "db_T"    || ["col1", "col2"]         || []
+        "sElEcT COL_1, Col-2 FrOM db-T"                   || "db-T"    || ["COL_1", "Col-2"]       || []
+        "select x as X, y AS y, Col_1 as Col_2, z from T" || "T"       || ["X", "y", "Col_2", "z"] || []
     }
 }
