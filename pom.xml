@@ -19,6 +19,14 @@
         <!-- Dependency versions -->
         <antlr4.version>4.7.1</antlr4.version>
         <aws.sdk.version>1.11.294</aws.sdk.version>
+        <groovy.major.version>2.4</groovy.major.version>
+        <groovy.patch.version>14</groovy.patch.version>
+        <groovy.version>${groovy.major.version}.${groovy.patch.version}</groovy.version>
+        <!--
+            Using version  1.1 to allow to use "detached" mocks
+            See http://spockframework.org/spock/docs/1.1/modules.html
+        -->
+        <spockframework.version>1.1-groovy-${groovy.major.version}</spockframework.version>
     </properties>
 
 
@@ -36,9 +44,80 @@
             <artifactId>aws-java-sdk-dynamodb</artifactId>
             <version>${aws.sdk.version}</version>
         </dependency>
+
+        <!-- Spock -->
+        <!-- Mandatory dependencies for using Spock -->
+        <dependency>
+            <groupId>org.spockframework</groupId>
+            <artifactId>spock-core</artifactId>
+            <version>${spockframework.version}</version>
+        </dependency>
+        <!-- Optional dependencies for using Spock -->
+        <dependency> <!-- use a specific Groovy version rather than the one specified by spock-core -->
+            <groupId>org.codehaus.groovy</groupId>
+            <artifactId>groovy-all</artifactId>
+            <version>${groovy.version}</version>
+        </dependency>
     </dependencies>
 
     <build>
+        <pluginManagement>
+            <plugins>
+                <!-- Spock -->
+                <!-- Mandatory plugins for using Spock -->
+                <plugin>
+                    <!-- The gmavenplus plugin is used to compile Groovy code. To learn more about this plugin,
+                    visit https://github.com/groovy/GMavenPlus/wiki -->
+                    <groupId>org.codehaus.gmavenplus</groupId>
+                    <artifactId>gmavenplus-plugin</artifactId>
+                    <version>1.6</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.codehaus.groovy</groupId>
+                            <artifactId>groovy-all</artifactId>
+                            <version>${groovy.version}</version>
+                            <scope>runtime</scope>
+                        </dependency>
+                    </dependencies>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>2.21.0</version>
+                    <configuration>
+                        <systemPropertyVariables>
+                            <java.awt.headless>true</java.awt.headless>
+                        </systemPropertyVariables>
+                    </configuration>
+                </plugin>
+
+                <!--
+                    The Failsafe Plugin is designed to run integration tests while the Surefire Plugin is designed
+                    to run unit tests. The name (failsafe) was chosen both because it is a synonym of surefire and
+                    because it implies that when it fails, it does so in a safe way.
+                    -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-failsafe-plugin</artifactId>
+                    <version>2.21.0</version>
+                    <executions>
+                        <execution>
+                            <id>integration-test</id>
+                            <goals>
+                                <goal>integration-test</goal>
+                                <goal>verify</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                    <configuration>
+                        <systemPropertyVariables>
+                            <java.awt.headless>true</java.awt.headless>
+                        </systemPropertyVariables>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -62,6 +141,44 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <!-- Spock -->
+            <!-- Mandatory plugins for using Spock -->
+            <plugin>
+                <!-- The gmavenplus plugin is used to compile Groovy code. To learn more about this plugin,
+                visit https://github.com/groovy/GMavenPlus/wiki -->
+                <groupId>org.codehaus.gmavenplus</groupId>
+                <artifactId>gmavenplus-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>compile</goal>
+                            <goal>compileTests</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Optional plugins for using Spock -->
+            <!-- Only required if names of spec classes don't match default Surefire patterns (`*Test` etc.) -->
+            <plugin>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <includes>
+                        <include>**/*Spec.java</include>
+                    </includes>
+                    <excludes>
+                        <exclude>**/*ITSpec.java</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <includes>
+                        <include>**/*ITSpec.java</include>
+                    </includes>
+                </configuration>
             </plugin>
         </plugins>
     </build>
