@@ -8,9 +8,9 @@ class SQLQuery {
 
     private final String tableName;
     private final List<Column> columns;
-    private final List<Expr> conditions;
+    private final Expr conditions;
 
-    SQLQuery(final String tableName, final List<Column> columns, final List<Expr> conditions) {
+    SQLQuery(final String tableName, final List<Column> columns, final Expr conditions) {
         this.tableName = tableName;
         this.columns = columns;
         this.conditions = conditions;
@@ -24,8 +24,8 @@ class SQLQuery {
         return columns;
     }
 
-    List<Expr> getConditions() {
-        return conditions;
+    Optional<Expr> getConditions() {
+        return Optional.ofNullable(conditions);
     }
 
     public enum Type {
@@ -73,6 +73,21 @@ class SQLQuery {
     }
 
     interface Expr {
+    }
+
+    enum Operator {
+        OR, AND;
+
+        Expr apply(final Expr expr1, final Expr expr2) {
+            switch (this) {
+                case OR:
+                    return new OrExpr(expr1, expr2);
+                case AND:
+                    return new AndExpr(expr1, expr2);
+                default:
+                    throw new UnsupportedOperationException("Operator is not supported");
+            }
+        }
     }
 
     static final class AndExpr implements Expr {
@@ -132,15 +147,27 @@ class SQLQuery {
         }
     }
 
-    static final class Scalar implements Expr {
+    static final class Scalar<T> implements Expr {
         private final String columnName;
-        private final String value;
+        private final T value;
         private final Operation operation;
 
-        Scalar(final String columnName, final String value, final Operation operation) {
+        Scalar(final String columnName, final T value, final Operation operation) {
             this.columnName = columnName;
             this.value = value;
             this.operation = operation;
+        }
+
+        String getColumnName() {
+            return columnName;
+        }
+
+        T getValue() {
+            return value;
+        }
+
+        Operation getOperation() {
+            return operation;
         }
 
         @Override
@@ -163,7 +190,49 @@ class SQLQuery {
         }
 
         enum Operation {
-            EQ, GE, GT, LT, LE, BETWEEN // LIKE?
+            GE(">="),
+            LE("<="),
+            NE_ANSI("<>"),
+            NE_C("!="),
+            GT(">"),
+            LT("<"),
+            EQ("="),
+            BETWEEN("BETWEEN"),
+            IS_NULL("IS NULL"),
+            IS_NOT_NULL("IS NOT NULL");
+            // LIKE?
+
+            private final String symbol;
+
+            Operation(final String symbol) {
+                this.symbol = symbol;
+            }
+
+            String getSymbol() {
+                return symbol;
+            }
+
+            Expr apply(final String column, final String... value) {
+                switch (this) {
+                    case GE:
+                        // fall through
+                    case LE:
+                        // fall through
+                    case NE_ANSI:
+                        // fall through
+                    case NE_C:
+                        // fall through
+                    case GT:
+                        // fall through
+                    case LT:
+                        // fall through
+                    case EQ:
+                        return new Scalar<>(column, value[0], this);
+                    default:
+                        throw new UnsupportedOperationException(
+                                String.format("Operation %s is not supported", this));
+                }
+            }
         }
     }
 }
