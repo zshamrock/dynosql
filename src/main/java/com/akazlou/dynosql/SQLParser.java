@@ -92,18 +92,13 @@ class SQLParser {
                 if (parts.size() == 2) {
                     stack.addFirst(parts.get(0));
                     stack.addFirst(operation);
-
-                    final Expr expr = reduce(
-                            (Operation) stack.removeFirst(), (String) stack.removeFirst(), parts.get(1));
-                    final Object action = stack.peekFirst();
-                    if (action instanceof Operator) {
-                        stack.addFirst(reduce((Operator) stack.removeFirst(), (Expr) stack.removeFirst(), expr));
-                    } else {
-                        stack.addFirst(expr);
-                    }
+                    stack.addFirst(parts.get(1));
+                    reduce(stack);
                 } else if (parts.size() == 1) {
                     if (token.startsWith(operation.getSymbol())) {
-                        stack.addFirst(reduce(operation, (String) stack.removeFirst(), parts.get(0)));
+                        stack.addFirst(operation);
+                        stack.addFirst(parts.get(0));
+                        reduce(stack);
                     } else {
                         stack.addFirst(parts.get(0));
                         stack.addFirst(operation);
@@ -116,14 +111,26 @@ class SQLParser {
                 stack.addFirst(operator);
             } else {
                 final Object action = stack.peekFirst();
+                stack.addFirst(token);
                 if (action instanceof Operation) {
-                    stack.addFirst(reduce(((Operation) stack.removeFirst()), (String) stack.removeFirst(), token));
-                } else {
-                    stack.addFirst(token);
+                    reduce(stack);
                 }
             }
         }
         return Optional.of((Expr) stack.removeFirst());
+    }
+
+    private void reduce(final Deque<Object> stack) {
+        final String value2 = (String) stack.removeFirst();
+        final Operation operation = (Operation) stack.removeFirst();
+        final String value1 = (String) stack.removeFirst();
+        final Expr expr = reduce(operation, value1, value2);
+        final Object action = stack.peekFirst();
+        if (action instanceof Operator) {
+            stack.addFirst(reduce((Operator) stack.removeFirst(), (Expr) stack.removeFirst(), expr));
+        } else {
+            stack.addFirst(expr);
+        }
     }
 
     private Expr reduce(final Operator operator, final Expr expr1, final Expr expr2) {

@@ -87,4 +87,43 @@ class SQLParserSpec extends Specification {
         "select * from T where id!= 1"  || new SQLQuery.Scalar<String>("id", "1", Operation.NE_C)
         "select * from T where id !=1"  || new SQLQuery.Scalar<String>("id", "1", Operation.NE_C)
     }
+
+    @Unroll
+    def "parse conditional where conditions #sql"(String sql, Expr conditions) {
+        when:
+        def query = new SQLParser().parse(sql).get()
+
+        then:
+        query.getConditions().isPresent()
+        query.getConditions().get() == conditions
+
+        where:
+        sql                                                              || conditions
+        "select * from T where x = 1 and y > 5"                          ||
+                new SQLQuery.AndExpr(
+                        new SQLQuery.Scalar("x", "1", Operation.EQ),
+                        new SQLQuery.Scalar("y", "5", Operation.GT))
+        "select * from T where x <> 1 OR y <= 5"                         ||
+                new SQLQuery.OrExpr(
+                        new SQLQuery.Scalar("x", "1", Operation.NE_ANSI),
+                        new SQLQuery.Scalar("y", "5", Operation.LE))
+        "select * from T where x = 1 and y > 5 and z != 3"               ||
+                new SQLQuery.AndExpr(
+                        new SQLQuery.AndExpr(new SQLQuery.Scalar("x", "1", Operation.EQ),
+                                new SQLQuery.Scalar("y", "5", Operation.GT)),
+                        new SQLQuery.Scalar("z", "3", Operation.NE_C))
+        "select * from T where x <> 1 OR y <= 5 AnD z = x"               ||
+                new SQLQuery.AndExpr(
+                        new SQLQuery.OrExpr(
+                                new SQLQuery.Scalar("x", "1", Operation.NE_ANSI),
+                                new SQLQuery.Scalar("y", "5", Operation.LE)),
+                        new SQLQuery.Scalar("z", "x", Operation.EQ))
+        "select * from T where x <> 1 OR y <= 5 AnD z = x and Col_1 > 7" ||
+                new SQLQuery.AndExpr(new SQLQuery.AndExpr(
+                        new SQLQuery.OrExpr(
+                                new SQLQuery.Scalar("x", "1", Operation.NE_ANSI),
+                                new SQLQuery.Scalar("y", "5", Operation.LE)),
+                        new SQLQuery.Scalar("z", "x", Operation.EQ)),
+                        new SQLQuery.Scalar("Col_1", "7", Operation.GT))
+    }
 }
