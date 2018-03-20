@@ -2,6 +2,7 @@ package com.akazlou.dynosql
 
 import static com.akazlou.dynosql.SQLQuery.Column
 import static com.akazlou.dynosql.SQLQuery.Expr
+import static com.akazlou.dynosql.SQLQuery.Scalar.Between
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation
 
 import spock.lang.Specification
@@ -125,5 +126,28 @@ class SQLParserSpec extends Specification {
                                 new SQLQuery.Scalar("y", "5", Operation.LE)),
                         new SQLQuery.Scalar("z", "x", Operation.EQ)),
                         new SQLQuery.Scalar("Col_1", "7", Operation.GT))
+    }
+
+    @Unroll
+    def "parse between in where conditions #sql"(String sql, Expr conditions) {
+        when:
+        def query = new SQLParser().parse(sql).get()
+
+        then:
+        query.getConditions().isPresent()
+        query.getConditions().get() == conditions
+
+        where:
+        sql                                                                                || conditions
+        "select * from T where x between 1 and 5"                                          ||
+                new SQLQuery.Scalar("x", new Between("1", "5"), Operation.BETWEEN)
+        "select * from T where x between 1 and 5 and t.Timestamp-MS beTween 1000 AnD 2000" ||
+                new SQLQuery.AndExpr(
+                        new SQLQuery.Scalar("x", new Between("1", "5"), Operation.BETWEEN),
+                        new SQLQuery.Scalar("t.Timestamp-MS", new Between("1000", "2000"), Operation.BETWEEN))
+        "select * from T where x between 1 and 5 or y BETWEEN -10 AND -5"                  ||
+                new SQLQuery.OrExpr(
+                        new SQLQuery.Scalar("x", new Between("1", "5"), Operation.BETWEEN),
+                        new SQLQuery.Scalar("y", new Between("-10", "-5"), Operation.BETWEEN))
     }
 }

@@ -1,6 +1,8 @@
 package com.akazlou.dynosql;
 
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation;
+import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.BETWEEN;
+import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.BETWEEN_AND;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.EQ;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.GE;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.GT;
@@ -10,6 +12,7 @@ import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.NE_ANSI;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.NE_C;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.LinkedList;
 import java.util.List;
@@ -42,7 +45,9 @@ class SQLParser {
             NE_C,
             GT,
             LT,
-            EQ
+            EQ,
+            BETWEEN,
+            BETWEEN_AND
     );
 
     public Optional<SQLQuery> parse(final String query) {
@@ -81,12 +86,16 @@ class SQLParser {
         final Deque<Object> stack = new LinkedList<>();
         final String[] tokens = conditions.trim().split("\\s+");
 
+        boolean isBetweenInProgress = false;
         for (final String token : tokens) {
-            final Optional<Operation> maybeOperation = containsOperation(token);
-            final Optional<Operator> maybeOperator = isOperator(token);
+            final String upperToken = token.toUpperCase(Locale.ROOT);
+            final Optional<Operation> maybeOperation = containsOperation(upperToken, isBetweenInProgress);
+            final Optional<Operator> maybeOperator = isOperator(upperToken, isBetweenInProgress);
             if (maybeOperation.isPresent()) {
                 final Operation operation = maybeOperation.get();
-                final List<String> parts = Arrays.stream(token.split(operation.getSymbol()))
+                final List<String> parts = operation == BETWEEN || operation == BETWEEN_AND
+                        ? Collections.emptyList()
+                        : Arrays.stream(token.split(operation.getSymbol()))
                         .filter(part -> !part.isEmpty())
                         .collect(Collectors.toList());
                 if (parts.size() == 2) {
@@ -106,14 +115,18 @@ class SQLParser {
                 } else {
                     stack.addFirst(operation);
                 }
+                if (operation == BETWEEN) {
+                    isBetweenInProgress = true;
+                }
             } else if (maybeOperator.isPresent()) {
                 final Operator operator = maybeOperator.get();
                 stack.addFirst(operator);
             } else {
                 final Object action = stack.peekFirst();
                 stack.addFirst(token);
-                if (action instanceof Operation) {
+                if (action instanceof Operation && action != BETWEEN) {
                     reduce(stack);
+                    isBetweenInProgress = false;
                 }
             }
         }
@@ -124,7 +137,13 @@ class SQLParser {
         final String value2 = (String) stack.removeFirst();
         final Operation operation = (Operation) stack.removeFirst();
         final String value1 = (String) stack.removeFirst();
-        final Expr expr = reduce(operation, value1, value2);
+        final Expr expr;
+        if (operation == BETWEEN_AND) {
+            // Remove BETWEEN from the stack, and the column name
+            expr = reduce((Operation) stack.removeFirst(), (String) stack.removeFirst(), value1, value2);
+        } else {
+            expr = reduce(operation, value1, value2);
+        }
         final Object action = stack.peekFirst();
         if (action instanceof Operator) {
             stack.addFirst(reduce((Operator) stack.removeFirst(), (Expr) stack.removeFirst(), expr));
@@ -137,22 +156,28 @@ class SQLParser {
         return operator.apply(expr1, expr2);
     }
 
-    private Expr reduce(final Operation operation, final String columnName, final String value) {
+    private Expr reduce(final Operation operation, final String columnName, final String... value) {
         return operation.apply(columnName, value);
     }
 
-    private Optional<Operator> isOperator(final String token) {
+    private Optional<Operator> isOperator(final String upperToken, final boolean isBetweenInProgress) {
         for (final Operator operator : Operator.values()) {
-            if (token.toUpperCase(Locale.ROOT).equals(operator.name())) {
+            if (upperToken.equals(operator.name())) {
+                if (operator == Operator.AND && isBetweenInProgress) {
+                    return Optional.empty();
+                }
                 return Optional.of(operator);
             }
         }
         return Optional.empty();
     }
 
-    private Optional<Operation> containsOperation(final String token) {
+    private Optional<Operation> containsOperation(final String upperToken, final boolean isBetweenInProgress) {
         for (final Operation operation : OPERATIONS) {
-            if (token.contains(operation.getSymbol())) {
+            if (upperToken.contains(operation.getSymbol())) {
+                if (operation == BETWEEN_AND && !isBetweenInProgress) {
+                    return Optional.empty();
+                }
                 return Optional.of(operation);
             }
         }

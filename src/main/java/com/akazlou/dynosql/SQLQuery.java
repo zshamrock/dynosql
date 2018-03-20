@@ -198,6 +198,7 @@ class SQLQuery {
             LT("<"),
             EQ("="),
             BETWEEN("BETWEEN"),
+            BETWEEN_AND("AND"),
             IS_NULL("IS NULL"),
             IS_NOT_NULL("IS NOT NULL");
             // LIKE?
@@ -228,10 +229,40 @@ class SQLQuery {
                         // fall through
                     case EQ:
                         return new Scalar<>(column, value[0], this);
+                    case BETWEEN:
+                        return new Scalar<>(column, new Between<>(value[0], value[1]), this);
                     default:
                         throw new UnsupportedOperationException(
                                 String.format("Operation %s is not supported", this));
                 }
+            }
+        }
+
+        static final class Between<T> {
+            private final T from;
+            private final T to;
+
+            Between(final T from, final T to) {
+                this.from = from;
+                this.to = to;
+            }
+
+            @Override
+            public boolean equals(final Object o) {
+                if (this == o) {
+                    return true;
+                }
+                if (!(o instanceof Between)) {
+                    return false;
+                }
+                final Between<?> between = (Between<?>) o;
+                return Objects.equals(from, between.from) &&
+                        Objects.equals(to, between.to);
+            }
+
+            @Override
+            public int hashCode() {
+                return Objects.hash(from, to);
             }
         }
     }
