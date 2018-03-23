@@ -200,7 +200,8 @@ class SQLQuery {
             BETWEEN("BETWEEN"),
             BETWEEN_AND("AND"),
             IS_NULL("IS NULL"),
-            IS_NOT_NULL("IS NOT NULL");
+            IS_NOT_NULL("IS NOT NULL"),
+            IN("IN");
             // LIKE?
 
             private final String symbol;

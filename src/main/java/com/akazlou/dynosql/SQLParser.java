@@ -84,53 +84,75 @@ class SQLParser {
             return Optional.empty();
         }
         final Deque<Object> stack = new LinkedList<>();
-        final String[] tokens = conditions.trim().split("\\s+");
+        final Deque<Context> contextStack = new LinkedList<>();
+        final StringBuilder builder = new StringBuilder();
+        final String conditionsWithTerminator = conditions + " ";
+        for (int i = 0; i < conditionsWithTerminator.length(); i++) {
+            final char c = conditionsWithTerminator.charAt(i);
+            if (c == ' ' && !isQuoteContext(contextStack.peekFirst())) {
+                final String token = builder.toString();
+                if (token.isEmpty()) {
+                    continue;
+                }
+                handleToken(builder.toString(), stack, contextStack);
+                builder.setLength(0);
+                continue;
+            }
+            builder.append(c);
+        }
 
-        boolean isBetweenInProgress = false;
-        for (final String token : tokens) {
-            final String upperToken = token.toUpperCase(Locale.ROOT);
-            final Optional<Operation> maybeOperation = containsOperation(upperToken, isBetweenInProgress);
-            final Optional<Operator> maybeOperator = isOperator(upperToken, isBetweenInProgress);
-            if (maybeOperation.isPresent()) {
-                final Operation operation = maybeOperation.get();
-                final List<String> parts = operation == BETWEEN || operation == BETWEEN_AND
-                        ? Collections.emptyList()
-                        : Arrays.stream(token.split(operation.getSymbol()))
-                        .filter(part -> !part.isEmpty())
-                        .collect(Collectors.toList());
-                if (parts.size() == 2) {
+        return Optional.of((Expr) stack.removeFirst());
+    }
+
+    private boolean isQuoteContext(final Context context) {
+        return context == Context.QUOTE;
+    }
+
+    private void handleToken(final String token, final Deque<Object> stack, final Deque<Context> contextStack) {
+        final Context context = contextStack.peekFirst();
+        final String upperToken = token.toUpperCase(Locale.ROOT);
+        final Optional<Operation> maybeOperation = containsOperation(upperToken, context);
+        final Optional<Operator> maybeOperator = isOperator(upperToken, context);
+        if (maybeOperation.isPresent()) {
+            final Operation operation = maybeOperation.get();
+            final List<String> parts = operation == BETWEEN || operation == BETWEEN_AND
+                    ? Collections.emptyList()
+                    : Arrays.stream(token.split(operation.getSymbol()))
+                    .filter(part -> !part.isEmpty())
+                    .collect(Collectors.toList());
+            if (parts.size() == 2) {
+                stack.addFirst(parts.get(0));
+                stack.addFirst(operation);
+                stack.addFirst(parts.get(1));
+                reduce(stack);
+            } else if (parts.size() == 1) {
+                if (token.startsWith(operation.getSymbol())) {
+                    stack.addFirst(operation);
+                    stack.addFirst(parts.get(0));
+                    reduce(stack);
+                } else {
                     stack.addFirst(parts.get(0));
                     stack.addFirst(operation);
-                    stack.addFirst(parts.get(1));
-                    reduce(stack);
-                } else if (parts.size() == 1) {
-                    if (token.startsWith(operation.getSymbol())) {
-                        stack.addFirst(operation);
-                        stack.addFirst(parts.get(0));
-                        reduce(stack);
-                    } else {
-                        stack.addFirst(parts.get(0));
-                        stack.addFirst(operation);
-                    }
-                } else {
-                    stack.addFirst(operation);
                 }
-                if (operation == BETWEEN) {
-                    isBetweenInProgress = true;
-                }
-            } else if (maybeOperator.isPresent()) {
-                final Operator operator = maybeOperator.get();
-                stack.addFirst(operator);
             } else {
-                final Object action = stack.peekFirst();
-                stack.addFirst(token);
-                if (action instanceof Operation && action != BETWEEN) {
-                    reduce(stack);
-                    isBetweenInProgress = false;
+                stack.addFirst(operation);
+            }
+            if (operation == BETWEEN) {
+                contextStack.addFirst(Context.BETWEEN);
+            }
+        } else if (maybeOperator.isPresent()) {
+            final Operator operator = maybeOperator.get();
+            stack.addFirst(operator);
+        } else {
+            final Object action = stack.peekFirst();
+            stack.addFirst(token);
+            if (action instanceof Operation && action != BETWEEN) {
+                reduce(stack);
+                if (!contextStack.isEmpty()) {
+                    contextStack.removeFirst();
                 }
             }
         }
-        return Optional.of((Expr) stack.removeFirst());
     }
 
     private void reduce(final Deque<Object> stack) {
@@ -160,10 +182,10 @@ class SQLParser {
         return operation.apply(columnName, value);
     }
 
-    private Optional<Operator> isOperator(final String upperToken, final boolean isBetweenInProgress) {
+    private Optional<Operator> isOperator(final String upperToken, final Context context) {
         for (final Operator operator : Operator.values()) {
             if (upperToken.equals(operator.name())) {
-                if (operator == Operator.AND && isBetweenInProgress) {
+                if (operator == Operator.AND && isBetweenContext(context)) {
                     return Optional.empty();
                 }
                 return Optional.of(operator);
@@ -172,15 +194,25 @@ class SQLParser {
         return Optional.empty();
     }
 
-    private Optional<Operation> containsOperation(final String upperToken, final boolean isBetweenInProgress) {
+    private Optional<Operation> containsOperation(final String upperToken, final Context context) {
         for (final Operation operation : OPERATIONS) {
             if (upperToken.contains(operation.getSymbol())) {
-                if (operation == BETWEEN_AND && !isBetweenInProgress) {
+                if (operation == BETWEEN_AND && !isBetweenContext(context)) {
                     return Optional.empty();
                 }
                 return Optional.of(operation);
             }
         }
         return Optional.empty();
+    }
+
+    private boolean isBetweenContext(final Context context) {
+        return context == Context.BETWEEN;
+    }
+
+    private enum Context {
+        BETWEEN,
+        QUOTE,
+        IN
     }
 }
