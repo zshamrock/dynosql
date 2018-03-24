@@ -129,7 +129,7 @@ class SQLParserSpec extends Specification {
     }
 
     @Unroll
-    def "parse between in where conditions #sql"(String sql, Expr conditions) {
+    def "parse BETWEEN in where conditions #sql"(String sql, Expr conditions) {
         when:
         def query = new SQLParser().parse(sql).get()
 
@@ -149,5 +149,44 @@ class SQLParserSpec extends Specification {
                 new SQLQuery.OrExpr(
                         new SQLQuery.Scalar("x", new Between("1", "5"), Operation.BETWEEN),
                         new SQLQuery.Scalar("y", new Between("-10", "-5"), Operation.BETWEEN))
+    }
+
+    @Unroll
+    def "parse IN in where conditions #sql"(String sql, Expr conditions) {
+        when:
+        def query = new SQLParser().parse(sql).get()
+
+        then:
+        query.getConditions().isPresent()
+        query.getConditions().get() == conditions
+
+        where:
+        sql                                                                                           || conditions
+        "select * from T where x in (1)"                                                              ||
+                new SQLQuery.Scalar("x", new SQLQuery.Scalar.In(["1"] as Set), Operation.IN)
+        "select * from T where x in ( 1 )"                                                            ||
+                new SQLQuery.Scalar("x", new SQLQuery.Scalar.In(["1"] as Set), Operation.IN)
+        "select * from T where x in (1, 2)"                                                           ||
+                new SQLQuery.Scalar("x", new SQLQuery.Scalar.In(["1", "2"] as Set), Operation.IN)
+        "select * from T where x in ( 1, 2 )"                                                         ||
+                new SQLQuery.Scalar("x", new SQLQuery.Scalar.In(["1", "2"] as Set), Operation.IN)
+        "select * from T where x in ( 1 , 2 )"                                                        ||
+                new SQLQuery.Scalar("x", new SQLQuery.Scalar.In(["1", "2"] as Set), Operation.IN)
+        "select * from T where x in (1,2)"                                                            ||
+                new SQLQuery.Scalar("x", new SQLQuery.Scalar.In(["1", "2"] as Set), Operation.IN)
+        "select * from T where x in (1, 2) and y in (1, 2, 3, 4, 5)"                                  ||
+                new SQLQuery.AndExpr(
+                        new SQLQuery.Scalar("x", new SQLQuery.Scalar.In(["1", "2"] as Set), Operation.IN),
+                        new SQLQuery.Scalar("y", new SQLQuery.Scalar.In(["1", "2", "3", "4", "5"] as Set), Operation.IN))
+        "select * from T where z = 5 or x in (1, 2) and y between 3 and 4 or a in (5, 6, 7) or b > 5" ||
+                new SQLQuery.OrExpr(
+                        new SQLQuery.OrExpr(
+                                new SQLQuery.AndExpr(
+                                        new SQLQuery.OrExpr(
+                                                new SQLQuery.Scalar("z", "5", Operation.EQ),
+                                                new SQLQuery.Scalar("x", new SQLQuery.Scalar.In(["1", "2"] as Set), Operation.IN)),
+                                        new SQLQuery.Scalar("y", new Between("3", "4"), Operation.BETWEEN)),
+                                new SQLQuery.Scalar("a", new SQLQuery.Scalar.In(["5", "6", "7"] as Set), Operation.IN)),
+                        new SQLQuery.Scalar("b", "5", Operation.GT))
     }
 }

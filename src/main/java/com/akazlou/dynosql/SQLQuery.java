@@ -1,8 +1,11 @@
 package com.akazlou.dynosql;
 
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 class SQLQuery {
 
@@ -232,6 +235,8 @@ class SQLQuery {
                         return new Scalar<>(column, value[0], this);
                     case BETWEEN:
                         return new Scalar<>(column, new Between<>(value[0], value[1]), this);
+                    case IN:
+                        return new Scalar<>(column, new In<>(new HashSet<>(Arrays.asList(value))), this);
                     default:
                         throw new UnsupportedOperationException(
                                 String.format("Operation %s is not supported", this));
@@ -264,6 +269,31 @@ class SQLQuery {
             @Override
             public int hashCode() {
                 return Objects.hash(from, to);
+            }
+        }
+
+        static final class In<T> {
+            private final Set<T> values;
+
+            In(final Set<T> values) {
+                this.values = values;
+            }
+
+            @Override
+            public boolean equals(final Object o) {
+                if (this == o) {
+                    return true;
+                }
+                if (!(o instanceof In)) {
+                    return false;
+                }
+                final In<?> in = (In<?>) o;
+                return Objects.equals(values, in.values);
+            }
+
+            @Override
+            public int hashCode() {
+                return Objects.hash(values);
             }
         }
     }

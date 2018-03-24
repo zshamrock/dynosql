@@ -6,11 +6,13 @@ import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.BETWEEN_AND;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.EQ;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.GE;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.GT;
+import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.IN;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.LE;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.LT;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.NE_ANSI;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.NE_C;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
@@ -47,8 +49,19 @@ class SQLParser {
             LT,
             EQ,
             BETWEEN,
-            BETWEEN_AND
+            BETWEEN_AND,
+            IN
     );
+
+    private final List<String> functions;
+
+    SQLParser() {
+        this(new ArrayList<>());
+    }
+
+    SQLParser(final List<String> functions) {
+        this.functions = Collections.unmodifiableList(functions);
+    }
 
     public Optional<SQLQuery> parse(final String query) {
         final Matcher matcher = SELECT_QUERY_PATTERN.matcher(query.trim());
@@ -83,94 +96,138 @@ class SQLParser {
         if (conditions == null) {
             return Optional.empty();
         }
-        final Deque<Object> stack = new LinkedList<>();
-        final Deque<Context> contextStack = new LinkedList<>();
+        final Deque<Object> tokens = new LinkedList<>();
+        final Deque<Context> contexts = new LinkedList<>();
+        final Deque<Character> parens = new LinkedList<>();
         final StringBuilder builder = new StringBuilder();
         final String conditionsWithTerminator = conditions + " ";
         for (int i = 0; i < conditionsWithTerminator.length(); i++) {
             final char c = conditionsWithTerminator.charAt(i);
-            if (c == ' ' && !isQuoteContext(contextStack.peekFirst())) {
+            final Context context = contexts.peekFirst();
+            if ((c == ' ' && !isQuoteContext(context))
+                    || (c == ',' && isInContext(context))) {
                 final String token = builder.toString();
                 if (token.isEmpty()) {
                     continue;
                 }
-                handleToken(builder.toString(), stack, contextStack);
+                handleToken(token, tokens, contexts);
                 builder.setLength(0);
                 continue;
+            }
+            if (c == '(') {
+                parens.addFirst('(');
+                continue;
+            }
+            if (c == ')') {
+                final char open = parens.peekFirst();
+                if (open != '(') {
+                    throw new IllegalArgumentException("Non matching parens");
+                }
+                parens.removeFirst();
+                if (parens.isEmpty() && context == Context.IN) {
+                    final String token = builder.toString();
+                    if (!token.isEmpty()) {
+                        handleToken(token, tokens, contexts);
+                        builder.setLength(0);
+                    }
+                    final List<String> values = new ArrayList<>();
+                    while (tokens.peekFirst() != Operation.IN) {
+                        values.add((String) tokens.removeFirst());
+                    }
+                    final Expr expr = reduce((Operation) tokens.removeFirst(),
+                            (String) tokens.removeFirst(),
+                            values.toArray(new String[values.size()]));
+                    if (tokens.peekFirst() instanceof Operator) {
+                        tokens.addFirst(reduce((Operator) tokens.removeFirst(), (Expr) tokens.removeFirst(), expr));
+                    } else {
+                        tokens.addFirst(expr);
+                    }
+                    contexts.removeFirst();
+                    continue;
+                }
             }
             builder.append(c);
         }
 
-        return Optional.of((Expr) stack.removeFirst());
+        return Optional.of((Expr) tokens.removeFirst());
     }
 
     private boolean isQuoteContext(final Context context) {
         return context == Context.QUOTE;
     }
 
-    private void handleToken(final String token, final Deque<Object> stack, final Deque<Context> contextStack) {
-        final Context context = contextStack.peekFirst();
+    private void handleToken(final String token, final Deque<Object> tokens, final Deque<Context> contexts) {
+        final Context context = contexts.peekFirst();
         final String upperToken = token.toUpperCase(Locale.ROOT);
         final Optional<Operation> maybeOperation = containsOperation(upperToken, context);
         final Optional<Operator> maybeOperator = isOperator(upperToken, context);
         if (maybeOperation.isPresent()) {
             final Operation operation = maybeOperation.get();
-            final List<String> parts = operation == BETWEEN || operation == BETWEEN_AND
+            final List<String> parts = isSpecial(operation)
                     ? Collections.emptyList()
                     : Arrays.stream(token.split(operation.getSymbol()))
                     .filter(part -> !part.isEmpty())
                     .collect(Collectors.toList());
             if (parts.size() == 2) {
-                stack.addFirst(parts.get(0));
-                stack.addFirst(operation);
-                stack.addFirst(parts.get(1));
-                reduce(stack);
+                tokens.addFirst(parts.get(0));
+                tokens.addFirst(operation);
+                tokens.addFirst(parts.get(1));
+                reduce(tokens);
             } else if (parts.size() == 1) {
                 if (token.startsWith(operation.getSymbol())) {
-                    stack.addFirst(operation);
-                    stack.addFirst(parts.get(0));
-                    reduce(stack);
+                    tokens.addFirst(operation);
+                    tokens.addFirst(parts.get(0));
+                    reduce(tokens);
                 } else {
-                    stack.addFirst(parts.get(0));
-                    stack.addFirst(operation);
+                    tokens.addFirst(parts.get(0));
+                    tokens.addFirst(operation);
                 }
             } else {
-                stack.addFirst(operation);
+                tokens.addFirst(operation);
             }
             if (operation == BETWEEN) {
-                contextStack.addFirst(Context.BETWEEN);
+                contexts.addFirst(Context.BETWEEN);
+            }
+            if (operation == IN) {
+                contexts.addFirst(Context.IN);
             }
         } else if (maybeOperator.isPresent()) {
             final Operator operator = maybeOperator.get();
-            stack.addFirst(operator);
+            tokens.addFirst(operator);
         } else {
-            final Object action = stack.peekFirst();
-            stack.addFirst(token);
-            if (action instanceof Operation && action != BETWEEN) {
-                reduce(stack);
-                if (!contextStack.isEmpty()) {
-                    contextStack.removeFirst();
+            final Object action = tokens.peekFirst();
+            tokens.addFirst(token);
+            if (action instanceof Operation && action != BETWEEN && action != IN) {
+                reduce(tokens);
+                if (!contexts.isEmpty()) {
+                    contexts.removeFirst();
                 }
             }
         }
     }
 
-    private void reduce(final Deque<Object> stack) {
-        final String value2 = (String) stack.removeFirst();
-        final Operation operation = (Operation) stack.removeFirst();
-        final String value1 = (String) stack.removeFirst();
+    private boolean isSpecial(final Operation operation) {
+        return operation == BETWEEN
+                || operation == BETWEEN_AND
+                || operation == IN;
+    }
+
+    private void reduce(final Deque<Object> tokens) {
+        final String value2 = (String) tokens.removeFirst();
+        final Operation operation = (Operation) tokens.removeFirst();
+        final String value1 = (String) tokens.removeFirst();
         final Expr expr;
         if (operation == BETWEEN_AND) {
             // Remove BETWEEN from the stack, and the column name
-            expr = reduce((Operation) stack.removeFirst(), (String) stack.removeFirst(), value1, value2);
+            expr = reduce((Operation) tokens.removeFirst(), (String) tokens.removeFirst(), value1, value2);
         } else {
             expr = reduce(operation, value1, value2);
         }
-        final Object action = stack.peekFirst();
+        final Object action = tokens.peekFirst();
         if (action instanceof Operator) {
-            stack.addFirst(reduce((Operator) stack.removeFirst(), (Expr) stack.removeFirst(), expr));
+            tokens.addFirst(reduce((Operator) tokens.removeFirst(), (Expr) tokens.removeFirst(), expr));
         } else {
-            stack.addFirst(expr);
+            tokens.addFirst(expr);
         }
     }
 
@@ -208,6 +265,10 @@ class SQLParser {
 
     private boolean isBetweenContext(final Context context) {
         return context == Context.BETWEEN;
+    }
+
+    private boolean isInContext(final Context context) {
+        return context == Context.IN;
     }
 
     private enum Context {
