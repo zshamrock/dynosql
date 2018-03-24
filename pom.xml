@@ -17,7 +17,6 @@
         <maven.compiler.target>${java.version}</maven.compiler.target>
 
         <!-- Dependency versions -->
-        <antlr4.version>4.7.1</antlr4.version>
         <spotbugs.version>3.1.2</spotbugs.version>
         <aws.sdk.version>1.11.294</aws.sdk.version>
         <groovy.major.version>2.4</groovy.major.version>
@@ -32,12 +31,6 @@
 
 
     <dependencies>
-        <dependency>
-            <groupId>org.antlr</groupId>
-            <artifactId>antlr4-runtime</artifactId>
-            <version>${antlr4.version}</version>
-        </dependency>
-
         <!-- AWS -->
         <!-- DynamoDB -->
         <dependency>
@@ -130,18 +123,6 @@
                     <testSource>${java.version}</testSource>
                     <testTarget>${java.version}</testTarget>
                 </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.antlr</groupId>
-                <artifactId>antlr4-maven-plugin</artifactId>
-                <version>${antlr4.version}</version>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>antlr4</goal>
-                        </goals>
-                    </execution>
-                </executions>
             </plugin>
             <!-- Spock -->
             <!-- Mandatory plugins for using Spock -->
