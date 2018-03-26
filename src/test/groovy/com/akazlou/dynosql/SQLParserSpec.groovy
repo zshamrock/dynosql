@@ -90,6 +90,60 @@ class SQLParserSpec extends Specification {
     }
 
     @Unroll
+    def "parse single quotes in simple where conditions #sql"(String sql, Expr conditions) {
+        when:
+        def query = new SQLParser().parse(sql).get()
+
+        then:
+        query.getConditions().isPresent()
+        query.getConditions().get() == conditions
+
+        where:
+        sql                               || conditions
+        // =
+        "select * from T where id = '(()1 ,)'"  || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.EQ)
+        "select * from T where id='(()1 ,)'"    || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.EQ)
+        "select * from T where id= '(()1 ,)'"   || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.EQ)
+        "select * from T where id ='(()1 ,)'"   || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.EQ)
+
+        // >
+        "select * from T where id > '(()1 ,)'"  || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.GT)
+        "select * from T where id>'(()1 ,)'"    || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.GT)
+        "select * from T where id> '(()1 ,)'"   || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.GT)
+        "select * from T where id >'(()1 ,)'"   || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.GT)
+
+        // >=
+        "select * from T where id >= '(()1 ,)'" || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.GE)
+        "select * from T where id>='(()1 ,)'"   || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.GE)
+        "select * from T where id>= '(()1 ,)'"  || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.GE)
+        "select * from T where id >='(()1 ,)'"  || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.GE)
+
+        // <
+        "select * from T where id < '(()1 ,)'"  || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.LT)
+        "select * from T where id<'(()1 ,)'"    || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.LT)
+        "select * from T where id< '(()1 ,)'"   || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.LT)
+        "select * from T where id <'(()1 ,)'"   || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.LT)
+
+        // <=
+        "select * from T where id <= '(()1 ,)'" || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.LE)
+        "select * from T where id<='(()1 ,)'"   || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.LE)
+        "select * from T where id<= '(()1 ,)'"  || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.LE)
+        "select * from T where id <='(()1 ,)'"  || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.LE)
+
+        // <>
+        "select * from T where id <> '(()1 ,)'" || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.NE_ANSI)
+        "select * from T where id<>'(()1 ,)'"   || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.NE_ANSI)
+        "select * from T where id<> '(()1 ,)'"  || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.NE_ANSI)
+        "select * from T where id <>'(()1 ,)'"  || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.NE_ANSI)
+
+        // !=
+        "select * from T where id != '(()1 ,)'" || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.NE_C)
+        "select * from T where id!='(()1 ,)'"   || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.NE_C)
+        "select * from T where id!= '(()1 ,)'"  || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.NE_C)
+        "select * from T where id !='(()1 ,)'"  || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.NE_C)
+    }
+
+    @Unroll
     def "parse conditional where conditions #sql"(String sql, Expr conditions) {
         when:
         def query = new SQLParser().parse(sql).get()

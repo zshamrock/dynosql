@@ -105,10 +105,17 @@ class SQLParser {
             final char c = conditionsWithTerminator.charAt(i);
             final Context context = contexts.peekFirst();
             if ((c == ' ' && !isQuoteContext(context))
-                    || (c == ',' && isInContext(context))) {
+                    || (c == ',' && isInContext(context))
+                    || (c == '\\' && isQuoteContext(context))) {
+                if (c == '\\') {
+                    builder.append(c);
+                }
                 final String token = builder.toString();
                 if (token.isEmpty()) {
                     continue;
+                }
+                if (context == Context.SINGLE_QUOTE) {
+                    contexts.removeFirst();
                 }
                 handleToken(token, tokens, contexts);
                 builder.setLength(0);
@@ -146,6 +153,9 @@ class SQLParser {
                     continue;
                 }
             }
+            if (c == '\\') {
+                contexts.addFirst(Context.SINGLE_QUOTE);
+            }
             builder.append(c);
         }
 
@@ -153,7 +163,7 @@ class SQLParser {
     }
 
     private boolean isQuoteContext(final Context context) {
-        return context == Context.QUOTE;
+        return context == Context.SINGLE_QUOTE;
     }
 
     private void handleToken(final String token, final Deque<Object> tokens, final Deque<Context> contexts) {
@@ -273,7 +283,7 @@ class SQLParser {
 
     private enum Context {
         BETWEEN,
-        QUOTE,
+        SINGLE_QUOTE,
         IN
     }
 }
