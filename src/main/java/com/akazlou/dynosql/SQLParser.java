@@ -53,6 +53,16 @@ class SQLParser {
             IN
     );
 
+    private static final char SINGLE_QUOTE = '\'';
+    private static final char SPACE = ' ';
+    private static final char COMMA = ',';
+    private static final char OPEN_PARENS = '(';
+    private static final char CLOSED_PARENS = ')';
+    private static final char EQUAL = '=';
+    private static final char GREATER = '>';
+    private static final char LESS = '<';
+    private static final char NOT = '!';
+
     private final List<String> functions;
 
     SQLParser() {
@@ -100,34 +110,89 @@ class SQLParser {
         final Deque<Context> contexts = new LinkedList<>();
         final Deque<Character> parens = new LinkedList<>();
         final StringBuilder builder = new StringBuilder();
-        final String conditionsWithTerminator = conditions + " ";
+        // Append space as the end terminator to process the last token
+        final String conditionsWithTerminator = conditions + SPACE;
         for (int i = 0; i < conditionsWithTerminator.length(); i++) {
-            final char c = conditionsWithTerminator.charAt(i);
             final Context context = contexts.peekFirst();
-            if ((c == ' ' && !isQuoteContext(context))
-                    || (c == ',' && isInContext(context))
-                    || (c == '\\' && isQuoteContext(context))) {
-                if (c == '\\') {
+            final char c = conditionsWithTerminator.charAt(i);
+            switch (c) {
+                case SINGLE_QUOTE:
+                    builder.append(c);
+                    if (isQuoteContext(context)) {
+                        contexts.removeFirst();
+                    } else {
+                        contexts.addFirst(Context.SINGLE_QUOTE);
+                    }
+                    continue;
+                case SPACE:
+                    if (isQuoteContext(context)) {
+                        builder.append(c);
+                        continue;
+                    }
+                case COMMA:
+                    if (isQuoteContext(context)) {
+                        builder.append(c);
+                        continue;
+                    }
+                    if (isInContext(context)) {
+                        // TODO handle
+                        continue;
+                    }
+                    throw new IllegalArgumentException(
+                            String.format("Could not parse WHERE conditions, unexpected %s: %s", COMMA, conditions));
+                case EQUAL:
+                    if (isQuoteContext(context)) {
+                        builder.append(c);
+                        continue;
+                    }
+                    // TODO handle
+                    tokens.addFirst(EQ);
+                    continue;
+                case NOT:
+                    if (isQuoteContext(context)) {
+                        builder.append(c);
+                        continue;
+                    }
+                    final char next = conditionsWithTerminator.charAt(i + 1);
+                    // TODO handle
+                    if (next == EQUAL) {
+                        tokens.addFirst(NE_C);
+                        i++;
+                        break;
+                    } else {
+                        throw new IllegalArgumentException(
+                                String.format("Could not parse WHERE conditions, unexpected %s: %s", NOT, conditions));
+                    }
+                case GREATER:
+                case LESS:
+                case OPEN_PARENS:
+                case CLOSED_PARENS:
+            }
+            if (isQuoteContext(context) && c != SINGLE_QUOTE) {
+                builder.append(c);
+                continue;
+            }
+            if ((c == SPACE && !isQuoteContext(context))
+                    || (c == COMMA && isInContext(context))
+                    || (c == SINGLE_QUOTE && isQuoteContext(context))) {
+                if (c == SINGLE_QUOTE) {
                     builder.append(c);
                 }
                 final String token = builder.toString();
                 if (token.isEmpty()) {
                     continue;
                 }
-                if (context == Context.SINGLE_QUOTE) {
-                    contexts.removeFirst();
-                }
                 handleToken(token, tokens, contexts);
                 builder.setLength(0);
                 continue;
             }
-            if (c == '(') {
-                parens.addFirst('(');
+            if (c == OPEN_PARENS) {
+                parens.addFirst(OPEN_PARENS);
                 continue;
             }
-            if (c == ')') {
+            if (c == CLOSED_PARENS) {
                 final char open = parens.peekFirst();
-                if (open != '(') {
+                if (open != OPEN_PARENS) {
                     throw new IllegalArgumentException("Non matching parens");
                 }
                 parens.removeFirst();
@@ -153,7 +218,7 @@ class SQLParser {
                     continue;
                 }
             }
-            if (c == '\\') {
+            if (c == SINGLE_QUOTE) {
                 contexts.addFirst(Context.SINGLE_QUOTE);
             }
             builder.append(c);
@@ -207,6 +272,9 @@ class SQLParser {
         } else {
             final Object action = tokens.peekFirst();
             tokens.addFirst(token);
+            if (isQuoteContext(context)) {
+                contexts.removeFirst();
+            }
             if (action instanceof Operation && action != BETWEEN && action != IN) {
                 reduce(tokens);
                 if (!contexts.isEmpty()) {
@@ -250,6 +318,9 @@ class SQLParser {
     }
 
     private Optional<Operator> isOperator(final String upperToken, final Context context) {
+        if (isQuoteContext(context)) {
+            return Optional.empty();
+        }
         for (final Operator operator : Operator.values()) {
             if (upperToken.equals(operator.name())) {
                 if (operator == Operator.AND && isBetweenContext(context)) {
@@ -262,6 +333,9 @@ class SQLParser {
     }
 
     private Optional<Operation> containsOperation(final String upperToken, final Context context) {
+        if (isQuoteContext(context)) {
+            return Optional.empty();
+        }
         for (final Operation operation : OPERATIONS) {
             if (upperToken.contains(operation.getSymbol())) {
                 if (operation == BETWEEN_AND && !isBetweenContext(context)) {
