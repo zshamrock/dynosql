@@ -129,13 +129,22 @@ class SQLParser {
                         builder.append(c);
                         continue;
                     }
+                    final String token = builder.toString();
+                    builder.setLength(0);
+                    if (!token.isEmpty()) {
+                        tokens.addFirst(token);
+                    }
+                    if (contexts.isEmpty()) {
+                        reduce(tokens);
+                    }
                 case COMMA:
                     if (isQuoteContext(context)) {
                         builder.append(c);
                         continue;
                     }
                     if (isInContext(context)) {
-                        // TODO handle
+                        tokens.addFirst(builder.toString());
+                        builder.setLength(0);
                         continue;
                     }
                     throw new IllegalArgumentException(
@@ -145,7 +154,6 @@ class SQLParser {
                         builder.append(c);
                         continue;
                     }
-                    // TODO handle
                     tokens.addFirst(EQ);
                     continue;
                 case NOT:
@@ -291,16 +299,14 @@ class SQLParser {
     }
 
     private void reduce(final Deque<Object> tokens) {
-        final String value2 = (String) tokens.removeFirst();
-        final Operation operation = (Operation) tokens.removeFirst();
-        final String value1 = (String) tokens.removeFirst();
-        final Expr expr;
-        if (operation == BETWEEN_AND) {
-            // Remove BETWEEN from the stack, and the column name
-            expr = reduce((Operation) tokens.removeFirst(), (String) tokens.removeFirst(), value1, value2);
-        } else {
-            expr = reduce(operation, value1, value2);
+        final Deque<String> values = new LinkedList<>();
+        while (!(tokens.peekFirst() instanceof Operation)) {
+            values.addLast((String) tokens.removeFirst());
         }
+        // operation
+        final Operation operation = (Operation) tokens.removeFirst();
+        final String columnName = (String) tokens.removeFirst();
+        final Expr expr = reduce(operation, columnName, values.toArray(new String[values.size()]));
         final Object action = tokens.peekFirst();
         if (action instanceof Operator) {
             tokens.addFirst(reduce((Operator) tokens.removeFirst(), (Expr) tokens.removeFirst(), expr));
