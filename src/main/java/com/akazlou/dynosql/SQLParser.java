@@ -2,7 +2,6 @@ package com.akazlou.dynosql;
 
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.BETWEEN;
-import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.BETWEEN_AND;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.EQ;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.GE;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.GT;
@@ -294,7 +293,6 @@ class SQLParser {
 
     private boolean isSpecial(final Operation operation) {
         return operation == BETWEEN
-                || operation == BETWEEN_AND
                 || operation == IN;
     }
 
@@ -344,9 +342,6 @@ class SQLParser {
         }
         for (final Operation operation : OPERATIONS) {
             if (upperToken.contains(operation.getSymbol())) {
-                if (operation == BETWEEN_AND && !isBetweenContext(context)) {
-                    return Optional.empty();
-                }
                 return Optional.of(operation);
             }
         }

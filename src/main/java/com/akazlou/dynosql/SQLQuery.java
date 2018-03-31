@@ -201,8 +201,6 @@ class SQLQuery {
             LT("<"),
             EQ("="),
             BETWEEN("BETWEEN"),
-            // TODO: remove this as the operation
-            BETWEEN_AND("AND"),
             IS_NULL("IS NULL"),
             IS_NOT_NULL("IS NOT NULL"),
             IN("IN");
