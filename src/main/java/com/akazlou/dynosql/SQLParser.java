@@ -48,7 +48,6 @@ class SQLParser {
             LT,
             EQ,
             BETWEEN,
-            BETWEEN_AND,
             IN
     );
 
@@ -114,6 +113,7 @@ class SQLParser {
         for (int i = 0; i < conditionsWithTerminator.length(); i++) {
             final Context context = contexts.peekFirst();
             final char c = conditionsWithTerminator.charAt(i);
+            char next;
             switch (c) {
                 case SINGLE_QUOTE:
                     builder.append(c);
@@ -133,9 +133,8 @@ class SQLParser {
                     if (!token.isEmpty()) {
                         tokens.addFirst(token);
                     }
-                    if (contexts.isEmpty()) {
-                        reduce(tokens);
-                    }
+                    reduce(tokens);
+                    continue;
                 case COMMA:
                     if (isQuoteContext(context)) {
                         builder.append(c);
@@ -160,20 +159,62 @@ class SQLParser {
                         builder.append(c);
                         continue;
                     }
-                    final char next = conditionsWithTerminator.charAt(i + 1);
-                    // TODO handle
+                    next = conditionsWithTerminator.charAt(i + 1);
                     if (next == EQUAL) {
                         tokens.addFirst(NE_C);
                         i++;
-                        break;
+                        continue;
                     } else {
                         throw new IllegalArgumentException(
                                 String.format("Could not parse WHERE conditions, unexpected %s: %s", NOT, conditions));
                     }
                 case GREATER:
+                    if (isQuoteContext(context)) {
+                        builder.append(c);
+                        continue;
+                    }
+                    next = conditionsWithTerminator.charAt(i + 1);
+                    if (next == EQUAL) {
+                        tokens.addFirst(GE);
+                        i++;
+                    } else {
+                        tokens.addFirst(GT);
+                    }
+                    continue;
                 case LESS:
+                    if (isQuoteContext(context)) {
+                        builder.append(c);
+                        continue;
+                    }
+                    next = conditionsWithTerminator.charAt(i + 1);
+                    if (next == EQUAL) {
+                        tokens.addFirst(LE);
+                        i++;
+                    } else if (next == GREATER) {
+                        tokens.addFirst(NE_ANSI);
+                    } else {
+                        tokens.addFirst(LT);
+                    }
+                    continue;
                 case OPEN_PARENS:
+                    if (isQuoteContext(context)) {
+                        builder.append(c);
+                        continue;
+                    }
+                    contexts.addFirst(Context.OPEN_PARENS);
+                    continue;
                 case CLOSED_PARENS:
+                    if (isQuoteContext(context)) {
+                        builder.append(c);
+                        continue;
+                    }
+                    if (context != Context.OPEN_PARENS) {
+                        throw new IllegalArgumentException(
+                                String.format("Could not parse WHERE conditions, not matching open parens: %s",
+                                        conditions));
+                    }
+                    contexts.removeFirst();
+                    continue;
             }
             if (isQuoteContext(context) && c != SINGLE_QUOTE) {
                 builder.append(c);
@@ -359,6 +400,7 @@ class SQLParser {
     private enum Context {
         BETWEEN,
         SINGLE_QUOTE,
-        IN
+        IN,
+        OPEN_PARENS
     }
 }
