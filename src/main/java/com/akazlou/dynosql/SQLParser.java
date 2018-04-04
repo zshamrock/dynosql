@@ -115,6 +115,19 @@ class SQLParser {
             final char c = conditionsWithTerminator.charAt(i);
             char next;
             switch (c) {
+                case SPACE:
+                    if (isQuoteContext(context)) {
+                        builder.append(c);
+                        continue;
+                    }
+                    // SPACE currently the single char if not in the quote context triggers token parse and reduction
+                    final String token = builder.toString();
+                    builder.setLength(0);
+                    if (!token.isEmpty()) {
+                        tokens.addFirst(parse(token, context));
+                    }
+                    reduce(tokens);
+                    continue;
                 case SINGLE_QUOTE:
                     builder.append(c);
                     if (isQuoteContext(context)) {
@@ -122,18 +135,6 @@ class SQLParser {
                     } else {
                         contexts.addFirst(Context.SINGLE_QUOTE);
                     }
-                    continue;
-                case SPACE:
-                    if (isQuoteContext(context)) {
-                        builder.append(c);
-                        continue;
-                    }
-                    final String token = builder.toString();
-                    builder.setLength(0);
-                    if (!token.isEmpty()) {
-                        tokens.addFirst(token);
-                    }
-                    reduce(tokens);
                     continue;
                 case COMMA:
                     if (isQuoteContext(context)) {
@@ -201,135 +202,47 @@ class SQLParser {
                         builder.append(c);
                         continue;
                     }
-                    contexts.addFirst(Context.OPEN_PARENS);
                     continue;
                 case CLOSED_PARENS:
                     if (isQuoteContext(context)) {
                         builder.append(c);
                         continue;
                     }
-                    if (context != Context.OPEN_PARENS) {
+                    if (parens.peekFirst() != OPEN_PARENS) {
                         throw new IllegalArgumentException(
-                                String.format("Could not parse WHERE conditions, not matching open parens: %s",
+                                String.format("Could not parse WHERE conditions, no matching open parens for the "
+                                                + "closed parens: %s",
                                         conditions));
                     }
-                    contexts.removeFirst();
+                    parens.removeFirst();
                     continue;
-            }
-            if (isQuoteContext(context) && c != SINGLE_QUOTE) {
-                builder.append(c);
-                continue;
-            }
-            if ((c == SPACE && !isQuoteContext(context))
-                    || (c == COMMA && isInContext(context))
-                    || (c == SINGLE_QUOTE && isQuoteContext(context))) {
-                if (c == SINGLE_QUOTE) {
+                default:
                     builder.append(c);
-                }
-                final String token = builder.toString();
-                if (token.isEmpty()) {
-                    continue;
-                }
-                handleToken(token, tokens, contexts);
-                builder.setLength(0);
-                continue;
             }
-            if (c == OPEN_PARENS) {
-                parens.addFirst(OPEN_PARENS);
-                continue;
-            }
-            if (c == CLOSED_PARENS) {
-                final char open = parens.peekFirst();
-                if (open != OPEN_PARENS) {
-                    throw new IllegalArgumentException("Non matching parens");
-                }
-                parens.removeFirst();
-                if (parens.isEmpty() && context == Context.IN) {
-                    final String token = builder.toString();
-                    if (!token.isEmpty()) {
-                        handleToken(token, tokens, contexts);
-                        builder.setLength(0);
-                    }
-                    final List<String> values = new ArrayList<>();
-                    while (tokens.peekFirst() != Operation.IN) {
-                        values.add((String) tokens.removeFirst());
-                    }
-                    final Expr expr = reduce((Operation) tokens.removeFirst(),
-                            (String) tokens.removeFirst(),
-                            values.toArray(new String[values.size()]));
-                    if (tokens.peekFirst() instanceof Operator) {
-                        tokens.addFirst(reduce((Operator) tokens.removeFirst(), (Expr) tokens.removeFirst(), expr));
-                    } else {
-                        tokens.addFirst(expr);
-                    }
-                    contexts.removeFirst();
-                    continue;
-                }
-            }
-            if (c == SINGLE_QUOTE) {
-                contexts.addFirst(Context.SINGLE_QUOTE);
-            }
-            builder.append(c);
+        }
+
+        if (!parens.isEmpty()) {
+            throw new IllegalArgumentException(
+                    String.format("Could not parse WHERE conditions, no matching parens: %s", conditions));
         }
 
         return Optional.of((Expr) tokens.removeFirst());
     }
 
-    private boolean isQuoteContext(final Context context) {
-        return context == Context.SINGLE_QUOTE;
+    private Object parse(final String token, final Context context) {
+        final Optional<Operation> operation = isOperation(token, context);
+        if (operation.isPresent()) {
+            return operation.get();
+        }
+        final Optional<Operator> operator = isOperator(token, context);
+        if (operator.isPresent()) {
+            return operator.get();
+        }
+        return token;
     }
 
-    private void handleToken(final String token, final Deque<Object> tokens, final Deque<Context> contexts) {
-        final Context context = contexts.peekFirst();
-        final String upperToken = token.toUpperCase(Locale.ROOT);
-        final Optional<Operation> maybeOperation = containsOperation(upperToken, context);
-        final Optional<Operator> maybeOperator = isOperator(upperToken, context);
-        if (maybeOperation.isPresent()) {
-            final Operation operation = maybeOperation.get();
-            final List<String> parts = isSpecial(operation)
-                    ? Collections.emptyList()
-                    : Arrays.stream(token.split(operation.getSymbol()))
-                    .filter(part -> !part.isEmpty())
-                    .collect(Collectors.toList());
-            if (parts.size() == 2) {
-                tokens.addFirst(parts.get(0));
-                tokens.addFirst(operation);
-                tokens.addFirst(parts.get(1));
-                reduce(tokens);
-            } else if (parts.size() == 1) {
-                if (token.startsWith(operation.getSymbol())) {
-                    tokens.addFirst(operation);
-                    tokens.addFirst(parts.get(0));
-                    reduce(tokens);
-                } else {
-                    tokens.addFirst(parts.get(0));
-                    tokens.addFirst(operation);
-                }
-            } else {
-                tokens.addFirst(operation);
-            }
-            if (operation == BETWEEN) {
-                contexts.addFirst(Context.BETWEEN);
-            }
-            if (operation == IN) {
-                contexts.addFirst(Context.IN);
-            }
-        } else if (maybeOperator.isPresent()) {
-            final Operator operator = maybeOperator.get();
-            tokens.addFirst(operator);
-        } else {
-            final Object action = tokens.peekFirst();
-            tokens.addFirst(token);
-            if (isQuoteContext(context)) {
-                contexts.removeFirst();
-            }
-            if (action instanceof Operation && action != BETWEEN && action != IN) {
-                reduce(tokens);
-                if (!contexts.isEmpty()) {
-                    contexts.removeFirst();
-                }
-            }
-        }
+    private boolean isQuoteContext(final Context context) {
+        return context == Context.SINGLE_QUOTE;
     }
 
     private boolean isSpecial(final Operation operation) {
@@ -362,12 +275,10 @@ class SQLParser {
         return operation.apply(columnName, value);
     }
 
-    private Optional<Operator> isOperator(final String upperToken, final Context context) {
-        if (isQuoteContext(context)) {
-            return Optional.empty();
-        }
+    private Optional<Operator> isOperator(final String token, final Context context) {
+        final String tokenUpper = token.toUpperCase(Locale.ROOT);
         for (final Operator operator : Operator.values()) {
-            if (upperToken.equals(operator.name())) {
+            if (tokenUpper.equals(operator.name())) {
                 if (operator == Operator.AND && isBetweenContext(context)) {
                     return Optional.empty();
                 }
@@ -377,12 +288,10 @@ class SQLParser {
         return Optional.empty();
     }
 
-    private Optional<Operation> containsOperation(final String upperToken, final Context context) {
-        if (isQuoteContext(context)) {
-            return Optional.empty();
-        }
+    private Optional<Operation> isOperation(final String token, final Context context) {
+        final String tokenUpper = token.toUpperCase(Locale.ROOT);
         for (final Operation operation : OPERATIONS) {
-            if (upperToken.contains(operation.getSymbol())) {
+            if (token.equals(operation.getSymbol())) {
                 return Optional.of(operation);
             }
         }
@@ -400,7 +309,6 @@ class SQLParser {
     private enum Context {
         BETWEEN,
         SINGLE_QUOTE,
-        IN,
-        OPEN_PARENS
+        IN
     }
 }
