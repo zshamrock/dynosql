@@ -113,7 +113,7 @@ class SQLParser {
         for (int i = 0; i < conditionsWithTerminator.length(); i++) {
             final Context context = contexts.peekFirst();
             final char c = conditionsWithTerminator.charAt(i);
-            char next;
+            final char next;
             switch (c) {
                 case SPACE:
                     if (isQuoteContext(context)) {
@@ -225,6 +225,11 @@ class SQLParser {
             throw new IllegalArgumentException(
                     String.format("Could not parse WHERE conditions, no matching parens: %s", conditions));
         }
+        if (tokens.size() != 1) {
+            throw new IllegalArgumentException(
+                    String.format("Could not parse WHERE conditions, was not reduced to the single expression: %s",
+                            conditions));
+        }
 
         return Optional.of((Expr) tokens.removeFirst());
     }
@@ -246,15 +251,21 @@ class SQLParser {
     }
 
     private boolean isSpecial(final Operation operation) {
-        return operation == BETWEEN
-                || operation == IN;
+        return operation == BETWEEN || operation == IN;
     }
 
     private void reduce(final Deque<Object> tokens) {
         final Deque<String> values = new LinkedList<>();
-        while (!(tokens.peekFirst() instanceof Operation)) {
+        while (!tokens.isEmpty() && !(tokens.peekFirst() instanceof Operation)) {
             values.addLast((String) tokens.removeFirst());
         }
+        if (tokens.isEmpty()) {
+            // put everything back
+            values.forEach(tokens::addFirst);
+            return;
+        }
+        // TODO: for each operation review whether everything is there, although for IN statement we could now,
+        // so probably have to create more contexts
         // operation
         final Operation operation = (Operation) tokens.removeFirst();
         final String columnName = (String) tokens.removeFirst();
