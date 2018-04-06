@@ -7,6 +7,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
+/**
+ * Represents parsed SQL query.
+ */
 class SQLQuery {
 
     private final String tableName;

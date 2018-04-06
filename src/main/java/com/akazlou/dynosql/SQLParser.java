@@ -26,6 +26,9 @@ import java.util.stream.Collectors;
 import com.akazlou.dynosql.SQLQuery.Expr;
 import com.akazlou.dynosql.SQLQuery.Operator;
 
+/**
+ * SQL parser.
+ */
 class SQLParser {
     private static final Pattern SELECT_QUERY_PATTERN = Pattern.compile(
             "^select\\s+(?<columns>[\\w.*,\\s\\-]+)"
