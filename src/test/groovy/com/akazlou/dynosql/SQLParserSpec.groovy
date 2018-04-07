@@ -47,8 +47,8 @@ class SQLParserSpec extends Specification {
         where:
         sql                             || conditions
         // =
-        "select * from T where id = 1"  || new SQLQuery.Scalar<String>("id", "1", Operation.EQ)
-//        "select * from T where id=1"    || new SQLQuery.Scalar<String>("id", "1", Operation.EQ)
+//        "select * from T where id = 1"  || new SQLQuery.Scalar<String>("id", "1", Operation.EQ)
+        "select * from T where id=1"    || new SQLQuery.Scalar<String>("id", "1", Operation.EQ)
 //        "select * from T where id= 1"   || new SQLQuery.Scalar<String>("id", "1", Operation.EQ)
 //        "select * from T where id =1"   || new SQLQuery.Scalar<String>("id", "1", Operation.EQ)
 //

@@ -15,10 +15,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -126,10 +128,13 @@ class SQLParser {
                     // SPACE currently the single char if not in the quote context triggers token parse and reduction
                     final String token = builder.toString();
                     builder.setLength(0);
-                    if (!token.isEmpty()) {
-                        tokens.addFirst(parse(token, context));
+                    if (token.isEmpty()) {
+                        continue;
                     }
-                    reduce(tokens);
+                    tokens.addFirst(parse(token, context));
+                    if (context != null) {
+                        tryReduce(context, tokens, contexts);
+                    }
                     continue;
                 case SINGLE_QUOTE:
                     builder.append(c);
@@ -156,6 +161,7 @@ class SQLParser {
                         builder.append(c);
                         continue;
                     }
+                    contexts.addFirst(Context.BASIC_OPERATION_CONTEXT);
                     tokens.addFirst(EQ);
                     continue;
                 case NOT:
@@ -166,6 +172,7 @@ class SQLParser {
                     next = conditionsWithTerminator.charAt(i + 1);
                     if (next == EQUAL) {
                         tokens.addFirst(NE_C);
+                        contexts.addFirst(Context.BASIC_OPERATION_CONTEXT);
                         i++;
                         continue;
                     } else {
@@ -184,6 +191,7 @@ class SQLParser {
                     } else {
                         tokens.addFirst(GT);
                     }
+                    contexts.addFirst(Context.BASIC_OPERATION_CONTEXT);
                     continue;
                 case LESS:
                     if (isQuoteContext(context)) {
@@ -199,6 +207,7 @@ class SQLParser {
                     } else {
                         tokens.addFirst(LT);
                     }
+                    contexts.addFirst(Context.BASIC_OPERATION_CONTEXT);
                     continue;
                 case OPEN_PARENS:
                     if (isQuoteContext(context)) {
@@ -218,6 +227,9 @@ class SQLParser {
                                         conditions));
                     }
                     parens.removeFirst();
+                    if (parens.isEmpty()) {
+                        tryReduce(context, tokens, contexts);
+                    }
                     continue;
                 default:
                     builder.append(c);
@@ -235,6 +247,56 @@ class SQLParser {
         }
 
         return Optional.of((Expr) tokens.removeFirst());
+    }
+
+    private void tryReduce(final Context context, final Deque<Object> tokens, final Deque<Context> contexts) {
+        final Operation operation;
+        final String columnName;
+        final Expr expr;
+        switch (context) {
+            case BASIC_OPERATION_CONTEXT:
+                final String value = (String) tokens.removeFirst();
+                operation = (Operation) tokens.removeFirst();
+                columnName = (String) tokens.removeFirst();
+                expr = reduce(operation, columnName, value);
+                contexts.removeFirst();
+                break;
+            case IN:
+                final Set<String> inValues = new HashSet<>();
+                while (!(tokens.peekFirst() instanceof Operator)) {
+                    inValues.add((String) tokens.removeFirst());
+                }
+                operation = (Operation) tokens.removeFirst();
+                columnName = (String) tokens.removeFirst();
+                expr = reduce(operation, columnName, inValues.toArray(new String[0]));
+                contexts.removeFirst();
+                break;
+            case BETWEEN:
+                final Deque<Object> betweenValues = new LinkedList<>();
+                while (!(tokens.peekFirst() instanceof Operation)) {
+                    betweenValues.addFirst(tokens.removeFirst());
+                }
+                if (betweenValues.size() != 2) {
+                    betweenValues.forEach(tokens::addFirst);
+                    return;
+                }
+                operation = (Operation) tokens.removeFirst();
+                columnName = (String) tokens.removeFirst();
+                expr = reduce(
+                        operation,
+                        columnName,
+                        (String) betweenValues.removeFirst(),
+                        (String) betweenValues.removeFirst());
+                break;
+            default:
+                throw new IllegalArgumentException(String.format("Unsupported context %s for the reduction", context));
+        }
+        final Object action = tokens.peekFirst();
+        if (action instanceof Operator) {
+            tokens.addFirst(reduce((Operator) tokens.removeFirst(), (Expr) tokens.removeFirst(), expr));
+        } else {
+            tokens.addFirst(expr);
+        }
     }
 
     private Object parse(final String token, final Context context) {
@@ -255,30 +317,6 @@ class SQLParser {
 
     private boolean isSpecial(final Operation operation) {
         return operation == BETWEEN || operation == IN;
-    }
-
-    private void reduce(final Deque<Object> tokens) {
-        final Deque<String> values = new LinkedList<>();
-        while (!tokens.isEmpty() && !(tokens.peekFirst() instanceof Operation)) {
-            values.addLast((String) tokens.removeFirst());
-        }
-        if (tokens.isEmpty()) {
-            // put everything back
-            values.forEach(tokens::addFirst);
-            return;
-        }
-        // TODO: for each operation review whether everything is there, although for IN statement we could now,
-        // so probably have to create more contexts
-        // operation
-        final Operation operation = (Operation) tokens.removeFirst();
-        final String columnName = (String) tokens.removeFirst();
-        final Expr expr = reduce(operation, columnName, values.toArray(new String[values.size()]));
-        final Object action = tokens.peekFirst();
-        if (action instanceof Operator) {
-            tokens.addFirst(reduce((Operator) tokens.removeFirst(), (Expr) tokens.removeFirst(), expr));
-        } else {
-            tokens.addFirst(expr);
-        }
     }
 
     private Expr reduce(final Operator operator, final Expr expr1, final Expr expr2) {
@@ -323,6 +361,7 @@ class SQLParser {
     private enum Context {
         BETWEEN,
         SINGLE_QUOTE,
+        BASIC_OPERATION_CONTEXT,
         IN
     }
 }
