@@ -47,46 +47,46 @@ class SQLParserSpec extends Specification {
         where:
         sql                             || conditions
         // =
-//        "select * from T where id = 1"  || new SQLQuery.Scalar<String>("id", "1", Operation.EQ)
+        "select * from T where id = 1"  || new SQLQuery.Scalar<String>("id", "1", Operation.EQ)
         "select * from T where id=1"    || new SQLQuery.Scalar<String>("id", "1", Operation.EQ)
-//        "select * from T where id= 1"   || new SQLQuery.Scalar<String>("id", "1", Operation.EQ)
-//        "select * from T where id =1"   || new SQLQuery.Scalar<String>("id", "1", Operation.EQ)
-//
-//        // >
-//        "select * from T where id > 1"  || new SQLQuery.Scalar<String>("id", "1", Operation.GT)
-//        "select * from T where id>1"    || new SQLQuery.Scalar<String>("id", "1", Operation.GT)
-//        "select * from T where id> 1"   || new SQLQuery.Scalar<String>("id", "1", Operation.GT)
-//        "select * from T where id >1"   || new SQLQuery.Scalar<String>("id", "1", Operation.GT)
-//
-//        // >=
-//        "select * from T where id >= 1" || new SQLQuery.Scalar<String>("id", "1", Operation.GE)
-//        "select * from T where id>=1"   || new SQLQuery.Scalar<String>("id", "1", Operation.GE)
-//        "select * from T where id>= 1"  || new SQLQuery.Scalar<String>("id", "1", Operation.GE)
-//        "select * from T where id >=1"  || new SQLQuery.Scalar<String>("id", "1", Operation.GE)
-//
-//        // <
-//        "select * from T where id < 1"  || new SQLQuery.Scalar<String>("id", "1", Operation.LT)
-//        "select * from T where id<1"    || new SQLQuery.Scalar<String>("id", "1", Operation.LT)
-//        "select * from T where id< 1"   || new SQLQuery.Scalar<String>("id", "1", Operation.LT)
-//        "select * from T where id <1"   || new SQLQuery.Scalar<String>("id", "1", Operation.LT)
-//
-//        // <=
-//        "select * from T where id <= 1" || new SQLQuery.Scalar<String>("id", "1", Operation.LE)
-//        "select * from T where id<=1"   || new SQLQuery.Scalar<String>("id", "1", Operation.LE)
-//        "select * from T where id<= 1"  || new SQLQuery.Scalar<String>("id", "1", Operation.LE)
-//        "select * from T where id <=1"  || new SQLQuery.Scalar<String>("id", "1", Operation.LE)
-//
-//        // <>
-//        "select * from T where id <> 1" || new SQLQuery.Scalar<String>("id", "1", Operation.NE_ANSI)
-//        "select * from T where id<>1"   || new SQLQuery.Scalar<String>("id", "1", Operation.NE_ANSI)
-//        "select * from T where id<> 1"  || new SQLQuery.Scalar<String>("id", "1", Operation.NE_ANSI)
-//        "select * from T where id <>1"  || new SQLQuery.Scalar<String>("id", "1", Operation.NE_ANSI)
-//
-//        // !=
-//        "select * from T where id != 1" || new SQLQuery.Scalar<String>("id", "1", Operation.NE_C)
-//        "select * from T where id!=1"   || new SQLQuery.Scalar<String>("id", "1", Operation.NE_C)
-//        "select * from T where id!= 1"  || new SQLQuery.Scalar<String>("id", "1", Operation.NE_C)
-//        "select * from T where id !=1"  || new SQLQuery.Scalar<String>("id", "1", Operation.NE_C)
+        "select * from T where id= 1"   || new SQLQuery.Scalar<String>("id", "1", Operation.EQ)
+        "select * from T where id =1"   || new SQLQuery.Scalar<String>("id", "1", Operation.EQ)
+
+        // >
+        "select * from T where id > 1"  || new SQLQuery.Scalar<String>("id", "1", Operation.GT)
+        "select * from T where id>1"    || new SQLQuery.Scalar<String>("id", "1", Operation.GT)
+        "select * from T where id> 1"   || new SQLQuery.Scalar<String>("id", "1", Operation.GT)
+        "select * from T where id >1"   || new SQLQuery.Scalar<String>("id", "1", Operation.GT)
+
+        // >=
+        "select * from T where id >= 1" || new SQLQuery.Scalar<String>("id", "1", Operation.GE)
+        "select * from T where id>=1"   || new SQLQuery.Scalar<String>("id", "1", Operation.GE)
+        "select * from T where id>= 1"  || new SQLQuery.Scalar<String>("id", "1", Operation.GE)
+        "select * from T where id >=1"  || new SQLQuery.Scalar<String>("id", "1", Operation.GE)
+
+        // <
+        "select * from T where id < 1"  || new SQLQuery.Scalar<String>("id", "1", Operation.LT)
+        "select * from T where id<1"    || new SQLQuery.Scalar<String>("id", "1", Operation.LT)
+        "select * from T where id< 1"   || new SQLQuery.Scalar<String>("id", "1", Operation.LT)
+        "select * from T where id <1"   || new SQLQuery.Scalar<String>("id", "1", Operation.LT)
+
+        // <=
+        "select * from T where id <= 1" || new SQLQuery.Scalar<String>("id", "1", Operation.LE)
+        "select * from T where id<=1"   || new SQLQuery.Scalar<String>("id", "1", Operation.LE)
+        "select * from T where id<= 1"  || new SQLQuery.Scalar<String>("id", "1", Operation.LE)
+        "select * from T where id <=1"  || new SQLQuery.Scalar<String>("id", "1", Operation.LE)
+
+        // <>
+        "select * from T where id <> 1" || new SQLQuery.Scalar<String>("id", "1", Operation.NE_ANSI)
+        "select * from T where id<>1"   || new SQLQuery.Scalar<String>("id", "1", Operation.NE_ANSI)
+        "select * from T where id<> 1"  || new SQLQuery.Scalar<String>("id", "1", Operation.NE_ANSI)
+        "select * from T where id <>1"  || new SQLQuery.Scalar<String>("id", "1", Operation.NE_ANSI)
+
+        // !=
+        "select * from T where id != 1" || new SQLQuery.Scalar<String>("id", "1", Operation.NE_C)
+        "select * from T where id!=1"   || new SQLQuery.Scalar<String>("id", "1", Operation.NE_C)
+        "select * from T where id!= 1"  || new SQLQuery.Scalar<String>("id", "1", Operation.NE_C)
+        "select * from T where id !=1"  || new SQLQuery.Scalar<String>("id", "1", Operation.NE_C)
     }
 
     @Unroll
@@ -99,7 +99,7 @@ class SQLParserSpec extends Specification {
         query.getConditions().get() == conditions
 
         where:
-        sql                               || conditions
+        sql                                     || conditions
         // =
         "select * from T where id = '(()1 ,)'"  || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.EQ)
         "select * from T where id='(()1 ,)'"    || new SQLQuery.Scalar<String>("id", "'(()1 ,)'", Operation.EQ)

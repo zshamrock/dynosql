@@ -119,6 +119,7 @@ class SQLParser {
             final Context context = contexts.peekFirst();
             final char c = conditionsWithTerminator.charAt(i);
             final char next;
+            final String token;
             switch (c) {
                 case SPACE:
                     if (isQuoteContext(context)) {
@@ -126,7 +127,7 @@ class SQLParser {
                         continue;
                     }
                     // SPACE currently the single char if not in the quote context triggers token parse and reduction
-                    final String token = builder.toString();
+                    token = builder.toString();
                     builder.setLength(0);
                     if (token.isEmpty()) {
                         continue;
@@ -161,6 +162,11 @@ class SQLParser {
                         builder.append(c);
                         continue;
                     }
+                    token = builder.toString();
+                    builder.setLength(0);
+                    if (!token.isEmpty()) {
+                        tokens.addFirst(token);
+                    }
                     contexts.addFirst(Context.BASIC_OPERATION_CONTEXT);
                     tokens.addFirst(EQ);
                     continue;
@@ -171,6 +177,11 @@ class SQLParser {
                     }
                     next = conditionsWithTerminator.charAt(i + 1);
                     if (next == EQUAL) {
+                        token = builder.toString();
+                        builder.setLength(0);
+                        if (!token.isEmpty()) {
+                            tokens.addFirst(token);
+                        }
                         tokens.addFirst(NE_C);
                         contexts.addFirst(Context.BASIC_OPERATION_CONTEXT);
                         i++;
@@ -183,6 +194,11 @@ class SQLParser {
                     if (isQuoteContext(context)) {
                         builder.append(c);
                         continue;
+                    }
+                    token = builder.toString();
+                    builder.setLength(0);
+                    if (!token.isEmpty()) {
+                        tokens.addFirst(token);
                     }
                     next = conditionsWithTerminator.charAt(i + 1);
                     if (next == EQUAL) {
@@ -198,11 +214,17 @@ class SQLParser {
                         builder.append(c);
                         continue;
                     }
+                    token = builder.toString();
+                    builder.setLength(0);
+                    if (!token.isEmpty()) {
+                        tokens.addFirst(token);
+                    }
                     next = conditionsWithTerminator.charAt(i + 1);
                     if (next == EQUAL) {
                         tokens.addFirst(LE);
                         i++;
                     } else if (next == GREATER) {
+                        i++;
                         tokens.addFirst(NE_ANSI);
                     } else {
                         tokens.addFirst(LT);
