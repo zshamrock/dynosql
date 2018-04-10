@@ -127,7 +127,6 @@ class SQLParser {
                         builder.append(c);
                         continue;
                     }
-                    // SPACE currently the single char if not in the quote context triggers token parse and reduction
                     token = builder.toString();
                     builder.setLength(0);
                     if (token.isEmpty()) {
@@ -240,19 +239,25 @@ class SQLParser {
                         builder.append(c);
                         continue;
                     }
+                    parens.addFirst(OPEN_PARENS);
                     continue;
                 case CLOSED_PARENS:
                     if (isQuoteContext(context)) {
                         builder.append(c);
                         continue;
                     }
-                    if (parens.peekFirst() != OPEN_PARENS) {
+                    if (parens.isEmpty() || parens.peekFirst() != OPEN_PARENS) {
                         throw new IllegalArgumentException(
                                 String.format("Could not parse WHERE conditions, no matching open parens for the "
                                                 + "closed parens: %s",
                                         conditions));
                     }
                     parens.removeFirst();
+                    token = builder.toString();
+                    builder.setLength(0);
+                    if (!token.isEmpty()) {
+                        tokens.addFirst(token);
+                    }
                     if (parens.isEmpty()) {
                         reduced = tryReduce(context, tokens);
                         if (reduced) {
@@ -293,10 +298,11 @@ class SQLParser {
                 break;
             case IN:
                 final Set<String> inValues = new HashSet<>();
-                while (!(tokens.peekFirst() instanceof Operator)) {
+                while (!(tokens.peekFirst() instanceof Operation)) {
                     inValues.add((String) tokens.removeFirst());
                 }
                 operation = (Operation) tokens.removeFirst();
+                verify(operation, IN);
                 columnName = (String) tokens.removeFirst();
                 expr = reduce(operation, columnName, inValues.toArray(new String[0]));
                 reduced = true;
@@ -311,6 +317,7 @@ class SQLParser {
                     return false;
                 }
                 operation = (Operation) tokens.removeFirst();
+                verify(operation, BETWEEN);
                 columnName = (String) tokens.removeFirst();
                 expr = reduce(
                         operation,
@@ -331,15 +338,24 @@ class SQLParser {
         return reduced;
     }
 
+    private void verify(final Operation operation, final Operation expected) {
+        if (operation != expected) {
+            throw new IllegalArgumentException(
+                    String.format("Expect %s keyword, but got %s", expected.getSymbol(), operation));
+        }
+    }
+
     private Optional<?> parse(final String token,
-                         final Context context,
-                         final Deque<Context> contexts) {
+                              final Context context,
+                              final Deque<Context> contexts) {
         final Optional<Operation> operation = isOperation(token, context);
         if (operation.isPresent()) {
             switch (operation.get()) {
                 case BETWEEN:
-                    // TODO: Is it possible to handle this without parsing contexts to the method?
                     contexts.addFirst(Context.BETWEEN);
+                    break;
+                case IN:
+                    contexts.addFirst(Context.IN);
                     break;
             }
             return operation;
