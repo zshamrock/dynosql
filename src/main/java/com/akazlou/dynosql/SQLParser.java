@@ -132,7 +132,7 @@ class SQLParser {
                     if (token.isEmpty()) {
                         continue;
                     }
-                    tokens.addFirst(parse(token, context));
+                    parse(token, context, contexts).ifPresent(tokens::addFirst);
                     if (context != null) {
                         tryReduce(context, tokens, contexts);
                     }
@@ -321,16 +321,27 @@ class SQLParser {
         }
     }
 
-    private Object parse(final String token, final Context context) {
+    private Optional<?> parse(final String token,
+                         final Context context,
+                         final Deque<Context> contexts) {
         final Optional<Operation> operation = isOperation(token, context);
         if (operation.isPresent()) {
-            return operation.get();
+            switch (operation.get()) {
+                case BETWEEN:
+                    contexts.addFirst(Context.BETWEEN);
+                    break;
+            }
+            return operation;
         }
         final Optional<Operator> operator = isOperator(token, context);
         if (operator.isPresent()) {
-            return operator.get();
+            return operator;
         }
-        return token;
+        final String tokenUpper = token.toUpperCase(Locale.ROOT);
+        if (tokenUpper.equals(Operator.AND.name()) && isBetweenContext(context)) {
+            return Optional.empty();
+        }
+        return Optional.of(token);
     }
 
     private boolean isQuoteContext(final Context context) {
@@ -365,7 +376,7 @@ class SQLParser {
     private Optional<Operation> isOperation(final String token, final Context context) {
         final String tokenUpper = token.toUpperCase(Locale.ROOT);
         for (final Operation operation : OPERATIONS) {
-            if (token.equals(operation.getSymbol())) {
+            if (tokenUpper.equals(operation.getSymbol())) {
                 return Optional.of(operation);
             }
         }

@@ -195,14 +195,14 @@ class SQLParserSpec extends Specification {
         sql                                                                                || conditions
         "select * from T where x between 1 and 5"                                          ||
                 new SQLQuery.Scalar("x", new Between("1", "5"), Operation.BETWEEN)
-        "select * from T where x between 1 and 5 and t.Timestamp-MS beTween 1000 AnD 2000" ||
-                new SQLQuery.AndExpr(
-                        new SQLQuery.Scalar("x", new Between("1", "5"), Operation.BETWEEN),
-                        new SQLQuery.Scalar("t.Timestamp-MS", new Between("1000", "2000"), Operation.BETWEEN))
-        "select * from T where x between 1 and 5 or y BETWEEN -10 AND -5"                  ||
-                new SQLQuery.OrExpr(
-                        new SQLQuery.Scalar("x", new Between("1", "5"), Operation.BETWEEN),
-                        new SQLQuery.Scalar("y", new Between("-10", "-5"), Operation.BETWEEN))
+//        "select * from T where x between 1 and 5 and t.Timestamp-MS beTween 1000 AnD 2000" ||
+//                new SQLQuery.AndExpr(
+//                        new SQLQuery.Scalar("x", new Between("1", "5"), Operation.BETWEEN),
+//                        new SQLQuery.Scalar("t.Timestamp-MS", new Between("1000", "2000"), Operation.BETWEEN))
+//        "select * from T where x between 1 and 5 or y BETWEEN -10 AND -5"                  ||
+//                new SQLQuery.OrExpr(
+//                        new SQLQuery.Scalar("x", new Between("1", "5"), Operation.BETWEEN),
+//                        new SQLQuery.Scalar("y", new Between("-10", "-5"), Operation.BETWEEN))
     }
 
     @Unroll
