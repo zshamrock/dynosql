@@ -120,6 +120,7 @@ class SQLParser {
             final char c = conditionsWithTerminator.charAt(i);
             final char next;
             final String token;
+            final boolean reduced;
             switch (c) {
                 case SPACE:
                     if (isQuoteContext(context)) {
@@ -134,7 +135,10 @@ class SQLParser {
                     }
                     parse(token, context, contexts).ifPresent(tokens::addFirst);
                     if (context != null) {
-                        tryReduce(context, tokens, contexts);
+                        reduced = tryReduce(context, tokens);
+                        if (reduced) {
+                            contexts.removeFirst();
+                        }
                     }
                     continue;
                 case SINGLE_QUOTE:
@@ -250,7 +254,10 @@ class SQLParser {
                     }
                     parens.removeFirst();
                     if (parens.isEmpty()) {
-                        tryReduce(context, tokens, contexts);
+                        reduced = tryReduce(context, tokens);
+                        if (reduced) {
+                            contexts.removeFirst();
+                        }
                     }
                     continue;
                 default:
@@ -271,17 +278,18 @@ class SQLParser {
         return Optional.of((Expr) tokens.removeFirst());
     }
 
-    private void tryReduce(final Context context, final Deque<Object> tokens, final Deque<Context> contexts) {
+    private boolean tryReduce(final Context context, final Deque<Object> tokens) {
         final Operation operation;
         final String columnName;
         final Expr expr;
+        final boolean reduced;
         switch (context) {
             case BASIC_OPERATION_CONTEXT:
                 final String value = (String) tokens.removeFirst();
                 operation = (Operation) tokens.removeFirst();
                 columnName = (String) tokens.removeFirst();
                 expr = reduce(operation, columnName, value);
-                contexts.removeFirst();
+                reduced = true;
                 break;
             case IN:
                 final Set<String> inValues = new HashSet<>();
@@ -291,7 +299,7 @@ class SQLParser {
                 operation = (Operation) tokens.removeFirst();
                 columnName = (String) tokens.removeFirst();
                 expr = reduce(operation, columnName, inValues.toArray(new String[0]));
-                contexts.removeFirst();
+                reduced = true;
                 break;
             case BETWEEN:
                 final Deque<Object> betweenValues = new LinkedList<>();
@@ -300,7 +308,7 @@ class SQLParser {
                 }
                 if (betweenValues.size() != 2) {
                     betweenValues.forEach(tokens::addFirst);
-                    return;
+                    return false;
                 }
                 operation = (Operation) tokens.removeFirst();
                 columnName = (String) tokens.removeFirst();
@@ -309,6 +317,7 @@ class SQLParser {
                         columnName,
                         (String) betweenValues.removeFirst(),
                         (String) betweenValues.removeFirst());
+                reduced = true;
                 break;
             default:
                 throw new IllegalArgumentException(String.format("Unsupported context %s for the reduction", context));
@@ -319,6 +328,7 @@ class SQLParser {
         } else {
             tokens.addFirst(expr);
         }
+        return reduced;
     }
 
     private Optional<?> parse(final String token,
@@ -328,6 +338,7 @@ class SQLParser {
         if (operation.isPresent()) {
             switch (operation.get()) {
                 case BETWEEN:
+                    // TODO: Is it possible to handle this without parsing contexts to the method?
                     contexts.addFirst(Context.BETWEEN);
                     break;
             }
