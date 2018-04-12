@@ -154,11 +154,7 @@ class SQLParser {
                         continue;
                     }
                     if (isInContext(context)) {
-                        token = builder.toString();
-                        builder.setLength(0);
-                        if (!token.isEmpty()) {
-                            tokens.addFirst(token);
-                        }
+                        buildTokenAndAppend(builder, tokens);
                         continue;
                     }
                     throw new IllegalArgumentException(
@@ -168,11 +164,7 @@ class SQLParser {
                         builder.append(c);
                         continue;
                     }
-                    token = builder.toString();
-                    builder.setLength(0);
-                    if (!token.isEmpty()) {
-                        tokens.addFirst(token);
-                    }
+                    buildTokenAndAppend(builder, tokens);
                     contexts.addFirst(Context.BASIC_OPERATION_CONTEXT);
                     tokens.addFirst(EQ);
                     continue;
@@ -183,11 +175,7 @@ class SQLParser {
                     }
                     next = conditionsWithTerminator.charAt(i + 1);
                     if (next == EQUAL) {
-                        token = builder.toString();
-                        builder.setLength(0);
-                        if (!token.isEmpty()) {
-                            tokens.addFirst(token);
-                        }
+                        buildTokenAndAppend(builder, tokens);
                         tokens.addFirst(NE_C);
                         contexts.addFirst(Context.BASIC_OPERATION_CONTEXT);
                         i++;
@@ -201,11 +189,7 @@ class SQLParser {
                         builder.append(c);
                         continue;
                     }
-                    token = builder.toString();
-                    builder.setLength(0);
-                    if (!token.isEmpty()) {
-                        tokens.addFirst(token);
-                    }
+                    buildTokenAndAppend(builder, tokens);
                     next = conditionsWithTerminator.charAt(i + 1);
                     if (next == EQUAL) {
                         tokens.addFirst(GE);
@@ -220,11 +204,7 @@ class SQLParser {
                         builder.append(c);
                         continue;
                     }
-                    token = builder.toString();
-                    builder.setLength(0);
-                    if (!token.isEmpty()) {
-                        tokens.addFirst(token);
-                    }
+                    buildTokenAndAppend(builder, tokens);
                     next = conditionsWithTerminator.charAt(i + 1);
                     if (next == EQUAL) {
                         tokens.addFirst(LE);
@@ -256,11 +236,7 @@ class SQLParser {
                                         conditions));
                     }
                     parens.removeFirst();
-                    token = builder.toString();
-                    builder.setLength(0);
-                    if (!token.isEmpty()) {
-                        tokens.addFirst(token);
-                    }
+                    buildTokenAndAppend(builder, tokens);
                     if (parens.isEmpty()) {
                         reduced = tryReduce(context, tokens);
                         if (reduced) {
@@ -286,18 +262,24 @@ class SQLParser {
         return Optional.of((Expr) tokens.removeFirst());
     }
 
+    private void buildTokenAndAppend(final StringBuilder builder, final Deque<Object> tokens) {
+        final String token = builder.toString();
+        builder.setLength(0);
+        if (!token.isEmpty()) {
+            tokens.addFirst(token);
+        }
+    }
+
     private boolean tryReduce(final Context context, final Deque<Object> tokens) {
         final Operation operation;
         final String columnName;
         final Expr expr;
-        final boolean reduced;
         switch (context) {
             case BASIC_OPERATION_CONTEXT:
                 final String value = (String) tokens.removeFirst();
                 operation = (Operation) tokens.removeFirst();
                 columnName = (String) tokens.removeFirst();
                 expr = reduce(operation, columnName, value);
-                reduced = true;
                 break;
             case IN:
                 final Set<String> inValues = new HashSet<>();
@@ -308,7 +290,6 @@ class SQLParser {
                 verify(operation, IN);
                 columnName = (String) tokens.removeFirst();
                 expr = reduce(operation, columnName, inValues.toArray(new String[0]));
-                reduced = true;
                 break;
             case BETWEEN:
                 final Deque<Object> betweenValues = new LinkedList<>();
@@ -327,7 +308,6 @@ class SQLParser {
                         columnName,
                         (String) betweenValues.removeFirst(),
                         (String) betweenValues.removeFirst());
-                reduced = true;
                 break;
             default:
                 throw new IllegalArgumentException(String.format("Unsupported context %s for the reduction", context));
@@ -338,7 +318,7 @@ class SQLParser {
         } else {
             tokens.addFirst(expr);
         }
-        return reduced;
+        return true;
     }
 
     private void verify(final Operation operation, final Operation expected) {
