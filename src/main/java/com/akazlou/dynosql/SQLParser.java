@@ -133,7 +133,7 @@ class SQLParser {
                         continue;
                     }
                     parse(token, context, contexts).ifPresent(tokens::addFirst);
-                    if (context != null) {
+                    if (context != null && parens.isEmpty()) {
                         reduced = tryReduce(context, tokens);
                         if (reduced) {
                             contexts.removeFirst();
