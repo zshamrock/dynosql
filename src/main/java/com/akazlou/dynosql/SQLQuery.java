@@ -3,9 +3,11 @@ package com.akazlou.dynosql;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Represents parsed SQL query.
@@ -122,6 +124,11 @@ class SQLQuery {
         public int hashCode() {
             return Objects.hash(ex1, ex2);
         }
+
+        @Override
+        public String toString() {
+            return String.format("%s and %s", ex1, ex2);
+        }
     }
 
     static final class OrExpr implements Expr {
@@ -148,8 +155,12 @@ class SQLQuery {
 
         @Override
         public int hashCode() {
-
             return Objects.hash(ex1, ex2);
+        }
+
+        @Override
+        public String toString() {
+            return String.format("%s or %s", ex1, ex2);
         }
     }
 
@@ -193,6 +204,11 @@ class SQLQuery {
         @Override
         public int hashCode() {
             return Objects.hash(columnName, value, operation);
+        }
+
+        @Override
+        public String toString() {
+            return String.format("%s %s %s", columnName, operation.getSymbol().toLowerCase(Locale.ROOT), value);
         }
 
         enum Operation {
@@ -272,6 +288,11 @@ class SQLQuery {
             public int hashCode() {
                 return Objects.hash(from, to);
             }
+
+            @Override
+            public String toString() {
+                return String.format("%s and %s", from, to);
+            }
         }
 
         static final class In<T> {
@@ -296,6 +317,11 @@ class SQLQuery {
             @Override
             public int hashCode() {
                 return Objects.hash(values);
+            }
+
+            @Override
+            public String toString() {
+                return values.stream().map(T::toString).collect(Collectors.joining(",", "(", ")"));
             }
         }
     }

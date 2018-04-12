@@ -154,8 +154,11 @@ class SQLParser {
                         continue;
                     }
                     if (isInContext(context)) {
-                        tokens.addFirst(builder.toString());
+                        token = builder.toString();
                         builder.setLength(0);
+                        if (!token.isEmpty()) {
+                            tokens.addFirst(token);
+                        }
                         continue;
                     }
                     throw new IllegalArgumentException(
