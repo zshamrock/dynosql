@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 
 import com.akazlou.dynosql.SQLQuery.Expr;
 import com.akazlou.dynosql.SQLQuery.Operator;
+import com.akazlou.dynosql.SQLQuery.Scalar.Keyword;
 
 /**
  * SQL parser.
@@ -132,7 +133,10 @@ class SQLParser {
                     if (token.isEmpty()) {
                         continue;
                     }
-                    parse(token, context, contexts).ifPresent(tokens::addFirst);
+                    final Optional<?> value = parse(token, context, contexts);
+                    value.ifPresent(tokens::addFirst);
+                    value.filter(v -> v instanceof Keyword && v == Keyword.NULL)
+                            .ifPresent(v -> contexts.addFirst(Context.BASIC_OPERATION_CONTEXT));
                     if (context != null && parens.isEmpty()) {
                         reduced = tryReduce(context, tokens);
                         if (reduced) {
@@ -343,6 +347,10 @@ class SQLParser {
             }
             return operation;
         }
+        final Optional<Keyword> keyword = isKeyword(token, context);
+        if (keyword.isPresent()) {
+            return keyword;
+        }
         final Optional<Operator> operator = isOperator(token, context);
         if (operator.isPresent()) {
             return operator;
@@ -378,6 +386,16 @@ class SQLParser {
                     return Optional.empty();
                 }
                 return Optional.of(operator);
+            }
+        }
+        return Optional.empty();
+    }
+
+    private Optional<Keyword> isKeyword(final String token, final Context context) {
+        final String tokenUpper = token.toUpperCase(Locale.ROOT);
+        for (final Keyword keyword : Keyword.values()) {
+            if (tokenUpper.equals(keyword.name())) {
+                return Optional.of(keyword);
             }
         }
         return Optional.empty();

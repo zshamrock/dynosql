@@ -36,10 +36,6 @@ class SQLQuery {
         return Optional.ofNullable(conditions);
     }
 
-    public enum Type {
-        SELECT
-    }
-
     static final class Column {
         private final String name;
         private final String alias;
@@ -209,6 +205,12 @@ class SQLQuery {
         @Override
         public String toString() {
             return String.format("%s %s %s", columnName, operation.getSymbol().toLowerCase(Locale.ROOT), value);
+        }
+
+        enum Keyword {
+            IS,
+            NOT,
+            NULL
         }
 
         enum Operation {
