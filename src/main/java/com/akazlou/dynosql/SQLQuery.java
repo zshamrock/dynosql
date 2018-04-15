@@ -3,7 +3,6 @@ package com.akazlou.dynosql;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -204,7 +203,10 @@ class SQLQuery {
 
         @Override
         public String toString() {
-            return String.format("%s %s %s", columnName, operation.getSymbol().toLowerCase(Locale.ROOT), value);
+            if (operation == Operation.IS_NULL || operation == Operation.IS_NOT_NULL) {
+                return String.format("%s %s", columnName, operation.getSymbol());
+            }
+            return String.format("%s %s %s", columnName, operation.getSymbol(), value);
         }
 
         enum Keyword {
@@ -253,6 +255,10 @@ class SQLQuery {
                         // fall through
                     case EQ:
                         return new Scalar<>(column, value[0], this);
+                    case IS_NULL:
+                        // Pass through
+                    case IS_NOT_NULL:
+                        return new Scalar<>(column, true, this);
                     case BETWEEN:
                         return new Scalar<>(column, new Between<>(value[0], value[1]), this);
                     case IN:

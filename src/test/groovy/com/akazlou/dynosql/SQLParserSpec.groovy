@@ -243,4 +243,32 @@ class SQLParserSpec extends Specification {
                                 new SQLQuery.Scalar("a", new SQLQuery.Scalar.In(["5", "6", "7"] as Set), Operation.IN)),
                         new SQLQuery.Scalar("b", "5", Operation.GT))
     }
+
+    @Unroll
+    def "parse is null and is not null where conditions #sql"(String sql, Expr conditions) {
+        when:
+        def query = new SQLParser().parse(sql).get()
+
+        then:
+        query.getConditions().isPresent()
+        query.getConditions().get() == conditions
+
+        where:
+        sql                                                           || conditions
+        "select * from T where id is null"                            || new SQLQuery.Scalar<Boolean>("id", true, Operation.IS_NULL)
+        "select * from T where id IS null"                            || new SQLQuery.Scalar<Boolean>("id", true, Operation.IS_NULL)
+        "select * from T where id is NULL"                            || new SQLQuery.Scalar<Boolean>("id", true, Operation.IS_NULL)
+        "select * from T where id IS NULL"                            || new SQLQuery.Scalar<Boolean>("id", true, Operation.IS_NULL)
+        "select * from T where id is not null"                        || new SQLQuery.Scalar<Boolean>("id", true, Operation.IS_NOT_NULL)
+        "select * from T where id IS not null"                        || new SQLQuery.Scalar<Boolean>("id", true, Operation.IS_NOT_NULL)
+        "select * from T where id is NOT null"                        || new SQLQuery.Scalar<Boolean>("id", true, Operation.IS_NOT_NULL)
+        "select * from T where id is NOT NULL"                        || new SQLQuery.Scalar<Boolean>("id", true, Operation.IS_NOT_NULL)
+        "select * from T where id IS NOT NULL"                        || new SQLQuery.Scalar<Boolean>("id", true, Operation.IS_NOT_NULL)
+        "select * from T where x is null and y is not null and z > 5" ||
+                new SQLQuery.AndExpr(
+                        new SQLQuery.AndExpr(
+                                new SQLQuery.Scalar<Boolean>("x", true, Operation.IS_NULL),
+                                new SQLQuery.Scalar<Boolean>("y", true, Operation.IS_NOT_NULL)),
+                        new SQLQuery.Scalar<String>("z", "5", Operation.GT))
+    }
 }

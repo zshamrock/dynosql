@@ -6,6 +6,8 @@ import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.EQ;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.GE;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.GT;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.IN;
+import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.IS_NOT_NULL;
+import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.IS_NULL;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.LE;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.LT;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.NE_ANSI;
@@ -117,7 +119,7 @@ class SQLParser {
         // Append space as the end terminator to process the last token
         final String conditionsWithTerminator = conditions + SPACE;
         for (int i = 0; i < conditionsWithTerminator.length(); i++) {
-            final Context context = contexts.peekFirst();
+            Context context = contexts.peekFirst();
             final char c = conditionsWithTerminator.charAt(i);
             final char next;
             final String token;
@@ -136,7 +138,10 @@ class SQLParser {
                     final Optional<?> value = parse(token, context, contexts);
                     value.ifPresent(tokens::addFirst);
                     value.filter(v -> v instanceof Keyword && v == Keyword.NULL)
-                            .ifPresent(v -> contexts.addFirst(Context.BASIC_OPERATION_CONTEXT));
+                            .ifPresent(v -> contexts.addFirst(Context.IS_NULL));
+                    if (contexts.peekFirst() == Context.IS_NULL) {
+                        context = Context.IS_NULL;
+                    }
                     if (context != null && parens.isEmpty()) {
                         reduced = tryReduce(context, tokens);
                         if (reduced) {
@@ -169,7 +174,7 @@ class SQLParser {
                         continue;
                     }
                     buildTokenAndAppend(builder, tokens);
-                    contexts.addFirst(Context.BASIC_OPERATION_CONTEXT);
+                    contexts.addFirst(Context.BASIC_OPERATION);
                     tokens.addFirst(EQ);
                     continue;
                 case NOT:
@@ -181,7 +186,7 @@ class SQLParser {
                     if (next == EQUAL) {
                         buildTokenAndAppend(builder, tokens);
                         tokens.addFirst(NE_C);
-                        contexts.addFirst(Context.BASIC_OPERATION_CONTEXT);
+                        contexts.addFirst(Context.BASIC_OPERATION);
                         i++;
                         continue;
                     } else {
@@ -201,7 +206,7 @@ class SQLParser {
                     } else {
                         tokens.addFirst(GT);
                     }
-                    contexts.addFirst(Context.BASIC_OPERATION_CONTEXT);
+                    contexts.addFirst(Context.BASIC_OPERATION);
                     continue;
                 case LESS:
                     if (isQuoteContext(context)) {
@@ -219,7 +224,7 @@ class SQLParser {
                     } else {
                         tokens.addFirst(LT);
                     }
-                    contexts.addFirst(Context.BASIC_OPERATION_CONTEXT);
+                    contexts.addFirst(Context.BASIC_OPERATION);
                     continue;
                 case OPEN_PARENS:
                     if (isQuoteContext(context)) {
@@ -279,11 +284,24 @@ class SQLParser {
         final String columnName;
         final Expr expr;
         switch (context) {
-            case BASIC_OPERATION_CONTEXT:
+            case BASIC_OPERATION:
                 final String value = (String) tokens.removeFirst();
                 operation = (Operation) tokens.removeFirst();
                 columnName = (String) tokens.removeFirst();
                 expr = reduce(operation, columnName, value);
+                break;
+            case IS_NULL:
+                // NULL keyword
+                tokens.removeFirst();
+                final Keyword isOrNotKeyword = (Keyword) tokens.removeFirst();
+                if (isOrNotKeyword == Keyword.NOT) {
+                    tokens.removeFirst();
+                    operation = IS_NOT_NULL;
+                } else {
+                    operation = IS_NULL;
+                }
+                columnName = (String) tokens.removeFirst();
+                expr = reduce(operation, columnName);
                 break;
             case IN:
                 final Set<String> inValues = new HashSet<>();
@@ -422,7 +440,8 @@ class SQLParser {
     private enum Context {
         BETWEEN,
         SINGLE_QUOTE,
-        BASIC_OPERATION_CONTEXT,
+        BASIC_OPERATION,
+        IS_NULL,
         IN
     }
 }
