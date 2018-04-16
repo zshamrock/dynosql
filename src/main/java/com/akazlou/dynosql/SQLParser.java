@@ -3,6 +3,7 @@ package com.akazlou.dynosql;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.BETWEEN;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.EQ;
+import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.EXISTS;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.GE;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.GT;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.IN;
@@ -12,6 +13,7 @@ import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.LE;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.LT;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.NE_ANSI;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.NE_C;
+import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.NOT_EXISTS;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -56,7 +58,8 @@ class SQLParser {
             LT,
             EQ,
             BETWEEN,
-            IN
+            IN,
+            EXISTS
     );
 
     private static final char SINGLE_QUOTE = '\'';
@@ -139,8 +142,10 @@ class SQLParser {
                     value.ifPresent(tokens::addFirst);
                     value.filter(v -> v instanceof Keyword && v == Keyword.NULL)
                             .ifPresent(v -> contexts.addFirst(Context.IS_NULL));
-                    if (contexts.peekFirst() == Context.IS_NULL) {
-                        context = Context.IS_NULL;
+                    value.filter(v -> v instanceof Operation && v == Operation.EXISTS)
+                            .ifPresent(v -> contexts.addFirst(Context.EXISTS));
+                    if (contexts.peekFirst() == Context.IS_NULL || contexts.peekFirst() == Context.EXISTS) {
+                        context = contexts.peekFirst();
                     }
                     if (context != null && parens.isEmpty()) {
                         reduced = tryReduce(context, tokens);
@@ -303,6 +308,22 @@ class SQLParser {
                 columnName = (String) tokens.removeFirst();
                 expr = reduce(operation, columnName);
                 break;
+            case EXISTS:
+                // EXISTS
+                tokens.removeFirst();
+                if (tokens.peekFirst() instanceof Keyword) {
+                    final Keyword keyword = (Keyword) tokens.removeFirst();
+                    if (keyword != Keyword.NOT) {
+                        throw new IllegalArgumentException(
+                                String.format("Expected %s for the EXISTS, but got %s", Keyword.NOT, keyword));
+                    }
+                    operation = NOT_EXISTS;
+                } else {
+                    operation = EXISTS;
+                }
+                columnName = (String) tokens.removeFirst();
+                expr = reduce(operation, columnName);
+                break;
             case IN:
                 final Set<String> inValues = new HashSet<>();
                 while (!(tokens.peekFirst() instanceof Operation)) {
@@ -442,6 +463,7 @@ class SQLParser {
         SINGLE_QUOTE,
         BASIC_OPERATION,
         IS_NULL,
-        IN
+        IN,
+        EXISTS
     }
 }

@@ -271,4 +271,31 @@ class SQLParserSpec extends Specification {
                                 new SQLQuery.Scalar<Boolean>("y", true, Operation.IS_NOT_NULL)),
                         new SQLQuery.Scalar<String>("z", "5", Operation.GT))
     }
+
+    @Unroll
+    def "parse exists and not exists where conditions #sql"(String sql, Expr conditions) {
+        when:
+        def query = new SQLParser().parse(sql).get()
+
+        then:
+        query.getConditions().isPresent()
+        query.getConditions().get() == conditions
+
+        where:
+        sql                                                         || conditions
+        "select * from T where id exists"                           || new SQLQuery.Scalar<Boolean>("id", true, Operation.EXISTS)
+        "select * from T where id EXISTS"                           || new SQLQuery.Scalar<Boolean>("id", true, Operation.EXISTS)
+        "select * from T where id eXiStS"                           || new SQLQuery.Scalar<Boolean>("id", true, Operation.EXISTS)
+        "select * from T where id not exists"                       || new SQLQuery.Scalar<Boolean>("id", true, Operation.NOT_EXISTS)
+        "select * from T where id NOT exists"                       || new SQLQuery.Scalar<Boolean>("id", true, Operation.NOT_EXISTS)
+        "select * from T where id not EXISTS"                       || new SQLQuery.Scalar<Boolean>("id", true, Operation.NOT_EXISTS)
+        "select * from T where id NOT EXISTS"                       || new SQLQuery.Scalar<Boolean>("id", true, Operation.NOT_EXISTS)
+        "select * from T where id nOt ExIsTs"                       || new SQLQuery.Scalar<Boolean>("id", true, Operation.NOT_EXISTS)
+        "select * from T where x exists and y not exists and z > 5" ||
+                new SQLQuery.AndExpr(
+                        new SQLQuery.AndExpr(
+                                new SQLQuery.Scalar<Boolean>("x", true, Operation.EXISTS),
+                                new SQLQuery.Scalar<Boolean>("y", true, Operation.NOT_EXISTS)),
+                        new SQLQuery.Scalar<String>("z", "5", Operation.GT))
+    }
 }

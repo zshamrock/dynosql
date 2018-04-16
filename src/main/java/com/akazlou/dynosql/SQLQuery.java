@@ -226,7 +226,9 @@ class SQLQuery {
             BETWEEN("BETWEEN"),
             IS_NULL("IS NULL"),
             IS_NOT_NULL("IS NOT NULL"),
-            IN("IN");
+            IN("IN"),
+            EXISTS("EXISTS"),
+            NOT_EXISTS("NOT EXISTS");
             // LIKE?
 
             private final String symbol;
@@ -258,6 +260,10 @@ class SQLQuery {
                     case IS_NULL:
                         // Pass through
                     case IS_NOT_NULL:
+                        // Pass through
+                    case EXISTS:
+                        // Pass through
+                    case NOT_EXISTS:
                         return new Scalar<>(column, true, this);
                     case BETWEEN:
                         return new Scalar<>(column, new Between<>(value[0], value[1]), this);
