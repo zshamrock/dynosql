@@ -17,16 +17,16 @@
         <maven.compiler.target>${java.version}</maven.compiler.target>
 
         <!-- Dependency versions -->
-        <spotbugs.version>3.1.2</spotbugs.version>
-        <aws.sdk.version>1.11.294</aws.sdk.version>
-        <groovy.major.version>2.4</groovy.major.version>
-        <groovy.patch.version>14</groovy.patch.version>
+        <spotbugs.version>3.1.10</spotbugs.version>
+        <aws.sdk.version>1.11.475</aws.sdk.version>
+        <groovy.major.version>2.5</groovy.major.version>
+        <groovy.patch.version>5</groovy.patch.version>
         <groovy.version>${groovy.major.version}.${groovy.patch.version}</groovy.version>
         <!--
             Using version  1.1 to allow to use "detached" mocks
             See http://spockframework.org/spock/docs/1.1/modules.html
         -->
-        <spockframework.version>1.1-groovy-${groovy.major.version}</spockframework.version>
+        <spockframework.version>1.2-groovy-${groovy.major.version}</spockframework.version>
     </properties>
 
 
