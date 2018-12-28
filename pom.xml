@@ -22,10 +22,6 @@
         <groovy.major.version>2.5</groovy.major.version>
         <groovy.patch.version>5</groovy.patch.version>
         <groovy.version>${groovy.major.version}.${groovy.patch.version}</groovy.version>
-        <!--
-            Using version  1.1 to allow to use "detached" mocks
-            See http://spockframework.org/spock/docs/1.1/modules.html
-        -->
         <spockframework.version>1.2-groovy-${groovy.major.version}</spockframework.version>
     </properties>
 
@@ -45,12 +41,7 @@
             <groupId>org.spockframework</groupId>
             <artifactId>spock-core</artifactId>
             <version>${spockframework.version}</version>
-        </dependency>
-        <!-- Optional dependencies for using Spock -->
-        <dependency> <!-- use a specific Groovy version rather than the one specified by spock-core -->
-            <groupId>org.codehaus.groovy</groupId>
-            <artifactId>groovy-all</artifactId>
-            <version>${groovy.version}</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
@@ -65,14 +56,6 @@
                     <groupId>org.codehaus.gmavenplus</groupId>
                     <artifactId>gmavenplus-plugin</artifactId>
                     <version>1.6.2</version>
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.codehaus.groovy</groupId>
-                            <artifactId>groovy-all</artifactId>
-                            <version>${groovy.version}</version>
-                            <scope>runtime</scope>
-                        </dependency>
-                    </dependencies>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
