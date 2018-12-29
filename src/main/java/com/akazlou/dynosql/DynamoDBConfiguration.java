@@ -9,16 +9,14 @@ import com.amazonaws.services.dynamodbv2.document.DynamoDB;
 class DynamoDBConfiguration {
     private final DynamoDBEnvironment dynamoDBEnvironment;
     private final AWSCredentialsProvider awsCredentialsProvider;
-    private final DynamoDB dynamoDB;
 
     DynamoDBConfiguration(final DynamoDBEnvironment dynamoDBEnvironment,
                           final AWSCredentialsProvider awsCredentialsProvider) {
         this.dynamoDBEnvironment = dynamoDBEnvironment;
         this.awsCredentialsProvider = awsCredentialsProvider;
-        this.dynamoDB = createClient();
     }
 
-    private DynamoDB createClient() {
+    public DynamoDB createClient() {
         final AmazonDynamoDB amazonDynamoDB = AmazonDynamoDBClient.builder()
                 .withCredentials(awsCredentialsProvider)
                 .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(
