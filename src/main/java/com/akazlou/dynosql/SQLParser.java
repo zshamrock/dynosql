@@ -15,7 +15,6 @@ import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.NE_ANSI;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.NE_C;
 import static com.akazlou.dynosql.SQLQuery.Scalar.Operation.NOT_EXISTS;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
@@ -75,7 +74,7 @@ class SQLParser {
     private final List<String> functions;
 
     SQLParser() {
-        this(new ArrayList<>());
+        this(Collections.emptyList());
     }
 
     SQLParser(final List<String> functions) {

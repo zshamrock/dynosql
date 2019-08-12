@@ -1,5 +1,12 @@
 package com.akazlou.dynosql;
 
+import static com.akazlou.dynosql.SQLQuery.Scalar.Args.MANY;
+import static com.akazlou.dynosql.SQLQuery.Scalar.Args.ONE;
+import static com.akazlou.dynosql.SQLQuery.Scalar.Args.TWO;
+import static com.akazlou.dynosql.SQLQuery.Scalar.Args.ZERO;
+import static com.amazonaws.services.dynamodbv2.xspec.ExpressionSpecBuilder.N;
+import static com.amazonaws.services.dynamodbv2.xspec.ExpressionSpecBuilder.S;
+
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -7,6 +14,11 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import com.amazonaws.services.dynamodbv2.document.PrimaryKey;
+import com.amazonaws.services.dynamodbv2.xspec.Condition;
+import com.amazonaws.services.dynamodbv2.xspec.ExpressionSpecBuilder;
+import com.amazonaws.services.dynamodbv2.xspec.PathOperand;
 
 /**
  * Represents parsed SQL query.
@@ -76,6 +88,7 @@ class SQLQuery {
     }
 
     interface Expr {
+        Condition apply(ExpressionSpecBuilder builder, PrimaryKey pk);
     }
 
     enum Operator {
@@ -124,6 +137,13 @@ class SQLQuery {
         public String toString() {
             return String.format("%s and %s", ex1, ex2);
         }
+
+        @Override
+        public Condition apply(final ExpressionSpecBuilder builder, final PrimaryKey pk) {
+            final Condition condition1 = ex1.apply(builder, pk);
+            final Condition condition2 = ex2.apply(builder, pk);
+            return null;
+        }
     }
 
     static final class OrExpr implements Expr {
@@ -146,6 +166,11 @@ class SQLQuery {
             final OrExpr orExpr = (OrExpr) o;
             return Objects.equals(ex1, orExpr.ex1) &&
                     Objects.equals(ex2, orExpr.ex2);
+        }
+
+        @Override
+        public Condition apply(final ExpressionSpecBuilder builder, final PrimaryKey pk) {
+            throw new UnsupportedOperationException("OR ");
         }
 
         @Override
@@ -197,6 +222,12 @@ class SQLQuery {
         }
 
         @Override
+        public Condition apply(final ExpressionSpecBuilder builder, final PrimaryKey pk) {
+            S()
+            return null;
+        }
+
+        @Override
         public int hashCode() {
             return Objects.hash(columnName, value, operation);
         }
@@ -215,26 +246,35 @@ class SQLQuery {
             NULL
         }
 
+        enum Args {
+            ZERO,
+            ONE,
+            TWO,
+            MANY
+        }
+
         enum Operation {
-            GE(">="),
-            LE("<="),
-            NE_ANSI("<>"),
-            NE_C("!="),
-            GT(">"),
-            LT("<"),
-            EQ("="),
-            BETWEEN("BETWEEN"),
-            IS_NULL("IS NULL"),
-            IS_NOT_NULL("IS NOT NULL"),
-            IN("IN"),
-            EXISTS("EXISTS"),
-            NOT_EXISTS("NOT EXISTS");
+            GE(">=", ONE),
+            LE("<=", ONE),
+            NE_ANSI("<>", ONE),
+            NE_C("!=", ONE),
+            GT(">", ONE),
+            LT("<", ONE),
+            EQ("=", ONE),
+            BETWEEN("BETWEEN", TWO),
+            IS_NULL("IS NULL", ZERO),
+            IS_NOT_NULL("IS NOT NULL", ZERO),
+            IN("IN", MANY),
+            EXISTS("EXISTS", ZERO),
+            NOT_EXISTS("NOT EXISTS", ZERO);
             // LIKE?
 
             private final String symbol;
+            private final Args args;
 
-            Operation(final String symbol) {
+            Operation(final String symbol, final Args args) {
                 this.symbol = symbol;
+                this.args = args;
             }
 
             String getSymbol() {
@@ -273,6 +313,47 @@ class SQLQuery {
                         throw new UnsupportedOperationException(
                                 String.format("Operation %s is not supported", this));
                 }
+            }
+
+            Condition toCondition(final String columnName, final String... value) {
+                final PathOperand operand = args == ONE ? defineValueType(columnName, value[0]) : null;
+                switch (this) {
+                    case GE:
+                        return operand.equals()
+                    case LE:
+                        // fall through
+                    case NE_ANSI:
+                        // fall through
+                    case NE_C:
+                        // fall through
+                    case GT:
+                        // fall through
+                    case LT:
+                        // fall through
+                    case EQ:
+                        return new Scalar<>(column, value[0], this);
+                    case IS_NULL:
+                        // Pass through
+                    case IS_NOT_NULL:
+                        // Pass through
+                    case EXISTS:
+                        // Pass through
+                    case NOT_EXISTS:
+                        return new Scalar<>(column, true, this);
+                    case BETWEEN:
+                        return new Scalar<>(column, new Between<>(value[0], value[1]), this);
+                    case IN:
+                        return new Scalar<>(column, new In<>(new HashSet<>(Arrays.asList(value))), this);
+                    default:
+                        throw new UnsupportedOperationException(
+                                String.format("Operation %s is not supported", this));
+                }
+            }
+
+            private PathOperand defineValueType(final String columnName, final String value) {
+                return value.startsWith("'") && value.endsWith("'")
+                        ? S(columnName)
+                        : N(columnName);
             }
         }
 
